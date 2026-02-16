@@ -2309,7 +2309,7 @@ void mos6502::Op_SMB7(uint16_t src)
 // This eliminates function pointer indirection for ~15-30% speedup on ARM
 void mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCount) {
 	uint8_t opcode;
-	uint8_t elapsedCycles;
+	uint32_t elapsedCycles;  // Use 32-bit for arithmetic
 	uint16_t src;
 
 	if(freeze) return;

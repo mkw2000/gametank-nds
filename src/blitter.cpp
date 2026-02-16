@@ -126,7 +126,7 @@ inline void Blitter::ProcessCycle(uint8_t &colorbus) {
     }
 }
 
-void Blitter::CatchUp(uint64_t cycles) {
+void Blitter::CatchUp(uint32_t cycles) {
     if(cycles == 0) {
         cycles = timekeeper->totalCyclesCount - last_updated_cycle;
     }
