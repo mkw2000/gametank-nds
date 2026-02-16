@@ -1371,13 +1371,37 @@ void refreshScreen() {
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
 
 	// Center 128x128 on 256x192
-	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;
-	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2;
+	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;  // = 64
+	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2; // = 32
 
+	// Optimized pixel conversion: process 2 pixels at a time
+	// Inline the ARGB->RGB15 conversion to avoid function call overhead
 	for (int y = 0; y < GT_HEIGHT; y++) {
-		for (int x = 0; x < GT_WIDTH; x++) {
-			uint32_t pixel = srcPixels[(srcY + y) * vRAM_Surface->w + x];
-			dsVram[(yOff + y) * NDS_SCREEN_WIDTH + (xOff + x)] = argb_to_rgb15(pixel);
+		uint32_t* srcRow = &srcPixels[(srcY + y) * vRAM_Surface->w];
+		uint16_t* dstRow = &dsVram[(yOff + y) * NDS_SCREEN_WIDTH + xOff];
+
+		// Process 128 pixels as 64 pairs (2 pixels per iteration)
+		for (int x = 0; x < GT_WIDTH; x += 2) {
+			// Load two 32-bit pixels at once
+			uint32_t pixel1 = srcRow[x];
+			uint32_t pixel2 = srcRow[x + 1];
+
+			// Convert pixel1: extract RGB and shift to 5-bit components
+			// ARGB format: 0xFFRRGGBB -> RGB15: 1bbbbbgggggrrrrr
+			uint16_t r1 = (pixel1 >> 16) & 0xFF;
+			uint16_t g1 = (pixel1 >> 8) & 0xFF;
+			uint16_t b1 = pixel1 & 0xFF;
+			uint16_t rgb15_1 = ((b1 >> 3) << 10) | ((g1 >> 3) << 5) | (r1 >> 3) | 0x8000;
+
+			// Convert pixel2
+			uint16_t r2 = (pixel2 >> 16) & 0xFF;
+			uint16_t g2 = (pixel2 >> 8) & 0xFF;
+			uint16_t b2 = pixel2 & 0xFF;
+			uint16_t rgb15_2 = ((b2 >> 3) << 10) | ((g2 >> 3) << 5) | (r2 >> 3) | 0x8000;
+
+			// Store both pixels
+			dstRow[x] = rgb15_1;
+			dstRow[x + 1] = rgb15_2;
 		}
 	}
 #else
