@@ -25,13 +25,13 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 		case ACP_NMI:
 #ifdef NDS_BUILD
             state.cpu->NMI();
-            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
 #else
             SDL_LockAudioDevice(state.device);
             state.cpu->NMI();
-            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
 #ifdef WRAPPER_MODE
-            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
 #endif
             SDL_UnlockAudioDevice(state.device);
 #endif
@@ -83,7 +83,7 @@ void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
             if(state->running) {
                 state->cpu->IRQ();
                 state->cpu->ClearIRQ();
-                state->cpu->RunOptimized(state->cycles_per_sample, cycle_counter);
+                state->cpu->Run(state->cycles_per_sample, cycle_counter);
             }
         }
     }
