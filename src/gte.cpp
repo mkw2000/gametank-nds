@@ -447,11 +447,13 @@ uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 	} else if((address >= 0x2800) && (address <= 0x2FFF)) {
 		return system_state.VIA_regs[address & 0xF];
 	} else if(address < 0x2000) {
+		#ifdef DEBUG_RAM_INIT
 		if(stateful) {
 			if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
-				//printf("WARNING! Uninitialized RAM read at %x (Bank %x)\n", address, system_state.banking >> 5);
+				printf("WARNING! Uninitialized RAM read at %x (Bank %x)\n", address, system_state.banking >> 5);
 			}
 		}
+		#endif
 		return *GetRAM(address);
 	} else if((address == 0x2008) || (address == 0x2009)) {
 		return joysticks->read((uint8_t) address, stateful);
@@ -624,10 +626,9 @@ void MemoryWrite(uint16_t address, uint8_t value) {
 		}
 	}
 	else if(address < 0x2000) {
-		/*if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
-			printf("First RAM write at %x (Bank %x) (Value %x)\n", address, system_state.banking >> 6, value);
-		}*/
+		#ifdef DEBUG_RAM_INIT
 		system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)] = true;
+		#endif
 		system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)] = value;
 	}
 }
@@ -655,7 +656,9 @@ void randomize_vram() {
 void randomize_memory() {
 	for(int i = 0; i < RAMSIZE; i++) {
 		system_state.ram[i] = rand() % 256;
+		#ifdef DEBUG_RAM_INIT
 		system_state.ram_initialized[i] = false;
+		#endif
 	}
 
 	for(int i = 0; i < VRAM_BUFFER_SIZE; i++) {
