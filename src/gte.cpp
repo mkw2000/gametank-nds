@@ -251,11 +251,11 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 #define RAM_HIGHBITS_SHIFT 7
 
 // Cached banking offsets - updated when banking register changes
-static uint32_t cached_ram_base = 0;
-static uint32_t cached_gram_base = 0;
-static uint32_t cached_vram_offset = 0;
-static bool cached_wrap_x = false;
-static bool cached_wrap_y = false;
+uint32_t cached_ram_base = 0;
+uint32_t cached_gram_base = 0;
+uint32_t cached_vram_offset = 0;
+bool cached_wrap_x = false;
+bool cached_wrap_y = false;
 
 // Fast RAM address using cached base
 #define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
@@ -412,6 +412,9 @@ uint8_t* GetRAM(const uint16_t address) {
 // Fast path for zero page reads ($0000-$00FF) - most frequent memory accesses
 // Zero page is always in the first 256 bytes of RAM, no banking applied to low byte
 #define ZP_READ_FAST(addr) (system_state.ram[(addr) & 0xFF])
+
+// Forward declaration
+uint8_t MemoryReadResolve(const uint16_t address, bool stateful);
 
 inline uint8_t MemoryReadFast(uint16_t address) {
 	// Fast path: Zero Page ($0000-$00FF)

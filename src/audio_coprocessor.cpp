@@ -66,7 +66,7 @@ void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
     int32_t clksPerSample = state->clksPerHostSample;
     int32_t irqRate = state->irqRate;
     int32_t irqCounter = state->irqCounter;
-    uint32_t cycle_counter = 0;
+    uint64_t cycle_counter = 0;
 
     for(int i = 0; i < numSamples; i++) {
         if(stream16 != NULL) {
