@@ -42,6 +42,9 @@ private:
 
     uint64_t last_updated_cycle = 0;
 
+    // Internal cycle processing - separated to enable batching optimization
+    inline void ProcessCycle(uint8_t &colorbus);
+
 public:
     static const uint8_t PARAM_VX      = 0;
     static const uint8_t PARAM_VY      = 1;
