@@ -395,7 +395,25 @@ uint8_t* GetRAM(const uint16_t address) {
 	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
 }
 
+// Fast path for zero page reads ($0000-$00FF) - most frequent memory accesses
+// Zero page is always in the first 256 bytes of RAM, no banking applied to low byte
+#define ZP_READ_FAST(addr) (system_state.ram[(addr) & 0xFF])
+
+inline uint8_t MemoryReadFast(uint16_t address) {
+	// Fast path: Zero Page ($0000-$00FF)
+	if (__builtin_expect(address < 0x100, 1)) {
+		return ZP_READ_FAST(address);
+	}
+	// Fall back to full resolve
+	return MemoryReadResolve(address, true);
+}
+
 uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
+	// Fast path for zero page - skip all other checks
+	if(address < 0x100) {
+		return ZP_READ_FAST(address);
+	}
+
 	if(address & 0x8000) {
 		switch(loadedRomType) {
 			case RomType::EEPROM8K:
