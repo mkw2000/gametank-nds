@@ -395,6 +395,18 @@ uint8_t* GetRAM(const uint16_t address) {
 	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
 }
 
+// Forward declaration
+uint8_t MemoryReadResolve(const uint16_t address, bool stateful);
+
+// Fast path for zero page reads - bypasses full address decoding
+inline uint8_t MemoryReadFast(uint16_t address) {
+	if(address < 0x100) {
+		// Zero page - direct access, no banking
+		return system_state.ram[address];
+	}
+	return MemoryReadResolve(address, true);
+}
+
 uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 	if(address & 0x8000) {
 		switch(loadedRomType) {
@@ -1960,7 +1972,7 @@ int main(int argC, char* argV[]) {
 
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
-	cpu_core = new mos6502(MemoryRead, MemoryWrite, CPUStopped, MemorySync);
+	cpu_core = new mos6502(MemoryReadFast, MemoryWrite, CPUStopped, MemorySync);
 	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
