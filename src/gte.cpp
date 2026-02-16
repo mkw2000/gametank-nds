@@ -250,7 +250,24 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 
 #define RAM_HIGHBITS_SHIFT 7
 
-#define FULL_RAM_ADDRESS(x) (((system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT) | (x))
+// Cached banking offsets - updated when banking register changes
+static uint32_t cached_ram_base = 0;
+static uint32_t cached_gram_base = 0;
+static uint32_t cached_vram_offset = 0;
+static bool cached_wrap_x = false;
+static bool cached_wrap_y = false;
+
+// Fast RAM address using cached base
+#define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
+
+// Update cached banking values when $2005 is written
+inline void UpdateBankingCache(uint8_t banking_value) {
+	cached_ram_base = (banking_value & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
+	cached_gram_base = ((banking_value & BANK_GRAM_MASK) << 16);
+	cached_vram_offset = (banking_value & BANK_VRAM_MASK) ? 0x4000 : 0;
+	cached_wrap_x = (banking_value & BANK_WRAPX_MASK) != 0;
+	cached_wrap_y = (banking_value & BANK_WRAPY_MASK) != 0;
+}
 
 extern unsigned char font_map[];
 
@@ -304,12 +321,10 @@ uint8_t VDMA_Read(uint16_t address) {
 		uint32_t offset = 0;
 		if(system_state.dma_control & DMA_CPU_TO_VRAM) {
 			bufPtr = system_state.vram;
-			if(system_state.banking & BANK_VRAM_MASK) {
-				offset = 0x4000;
-			}
+			offset = cached_vram_offset;
 		} else {
 			bufPtr = system_state.gram;
-			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
+			offset = ((cached_gram_base >> 14) | (blitter->gram_mid_bits)) << 14;
 		}
 		return bufPtr[(address & 0x3FFF) | offset];
 	}
@@ -327,15 +342,14 @@ void VDMA_Write(uint16_t address, uint8_t value) {
 		if(system_state.dma_control & DMA_CPU_TO_VRAM) {
 			bufPtr = system_state.vram;
 			targetSurface = vRAM_Surface;
-			if(system_state.banking & BANK_VRAM_MASK) {
-				offset = 0x4000;
-				yShift = GT_HEIGHT;
-			}
+			offset = cached_vram_offset;
+			yShift = cached_vram_offset ? GT_HEIGHT : 0;
 		} else {
 			bufPtr = system_state.gram;
 			targetSurface = gRAM_Surface;
-			yShift = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) * GT_HEIGHT;
-			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
+			uint32_t gram_page = (cached_gram_base >> 14) | (blitter->gram_mid_bits);
+			yShift = gram_page * GT_HEIGHT;
+			offset = gram_page << 14;
 		}
 		bufPtr[(address & 0x3FFF) | offset] = value;
 
@@ -602,6 +616,7 @@ void MemoryWrite(uint16_t address, uint8_t value) {
 			} else if((address & 0x000F) == 0x0005) {
 				blitter->CatchUp();
 				system_state.banking = value;
+				UpdateBankingCache(value);
 				//printf("banking reg set to %x\n", value);
 			} else {
 				soundcard->register_write(address, value);
@@ -654,6 +669,7 @@ void randomize_memory() {
 	system_state.dma_control = rand() % 256;
 	system_state.dma_control_irq = (system_state.dma_control & DMA_COPY_IRQ_BIT) != 0;
 	system_state.banking = rand() % 256;
+	UpdateBankingCache(system_state.banking);
 	blitter->gram_mid_bits = rand() % 4;
 }
 
@@ -1999,6 +2015,9 @@ int main(int argC, char* argV[]) {
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
 	cpu_core = new mos6502(MemoryRead, MemoryWrite, CPUStopped, MemorySync);
+
+	// Initialize banking cache from current banking register
+	UpdateBankingCache(system_state.banking);
 	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
