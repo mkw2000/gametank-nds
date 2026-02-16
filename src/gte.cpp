@@ -250,21 +250,7 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 
 #define RAM_HIGHBITS_SHIFT 7
 
-// Cached banking offsets - updated when banking register changes
-uint32_t cached_ram_base = 0;
-uint32_t cached_gram_base = 0;
-uint32_t cached_vram_offset = 0;
-bool cached_wrap_x = false;
-bool cached_wrap_y = false;
-
-// Use original banking calculation
 #define FULL_RAM_ADDRESS(x) (((system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT) | (x))
-
-// Update cached banking values when $2005 is written
-inline void UpdateBankingCache(uint8_t banking_value) {
-	// DISABLED - using original banking calculation
-	(void)banking_value;
-}
 
 extern unsigned char font_map[];
 
@@ -409,28 +395,7 @@ uint8_t* GetRAM(const uint16_t address) {
 	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
 }
 
-// Fast path for zero page reads ($0000-$00FF) - most frequent memory accesses
-// Zero page is always in the first 256 bytes of RAM, no banking applied to low byte
-#define ZP_READ_FAST(addr) (system_state.ram[(addr) & 0xFF])
-
-// Forward declaration
-uint8_t MemoryReadResolve(const uint16_t address, bool stateful);
-
-inline uint8_t MemoryReadFast(uint16_t address) {
-	// Fast path: Zero Page ($0000-$00FF)
-	if (__builtin_expect(address < 0x100, 1)) {
-		return ZP_READ_FAST(address);
-	}
-	// Fall back to full resolve
-	return MemoryReadResolve(address, true);
-}
-
 uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
-	// Fast path for zero page - skip all other checks
-	if(address < 0x100) {
-		return ZP_READ_FAST(address);
-	}
-
 	if(address & 0x8000) {
 		switch(loadedRomType) {
 			case RomType::EEPROM8K:
@@ -450,13 +415,11 @@ uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 	} else if((address >= 0x2800) && (address <= 0x2FFF)) {
 		return system_state.VIA_regs[address & 0xF];
 	} else if(address < 0x2000) {
-		#ifdef DEBUG_RAM_INIT
 		if(stateful) {
 			if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
-				printf("WARNING! Uninitialized RAM read at %x (Bank %x)\n", address, system_state.banking >> 5);
+				//printf("WARNING! Uninitialized RAM read at %x (Bank %x)\n", address, system_state.banking >> 5);
 			}
 		}
-		#endif
 		return *GetRAM(address);
 	} else if((address == 0x2008) || (address == 0x2009)) {
 		return joysticks->read((uint8_t) address, stateful);
@@ -621,7 +584,6 @@ void MemoryWrite(uint16_t address, uint8_t value) {
 			} else if((address & 0x000F) == 0x0005) {
 				blitter->CatchUp();
 				system_state.banking = value;
-				UpdateBankingCache(value);
 				//printf("banking reg set to %x\n", value);
 			} else {
 				soundcard->register_write(address, value);
@@ -629,9 +591,10 @@ void MemoryWrite(uint16_t address, uint8_t value) {
 		}
 	}
 	else if(address < 0x2000) {
-		#ifdef DEBUG_RAM_INIT
+		/*if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
+			printf("First RAM write at %x (Bank %x) (Value %x)\n", address, system_state.banking >> 6, value);
+		}*/
 		system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)] = true;
-		#endif
 		system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)] = value;
 	}
 }
@@ -659,9 +622,7 @@ void randomize_vram() {
 void randomize_memory() {
 	for(int i = 0; i < RAMSIZE; i++) {
 		system_state.ram[i] = rand() % 256;
-		#ifdef DEBUG_RAM_INIT
 		system_state.ram_initialized[i] = false;
-		#endif
 	}
 
 	for(int i = 0; i < VRAM_BUFFER_SIZE; i++) {
@@ -675,7 +636,6 @@ void randomize_memory() {
 	system_state.dma_control = rand() % 256;
 	system_state.dma_control_irq = (system_state.dma_control & DMA_COPY_IRQ_BIT) != 0;
 	system_state.banking = rand() % 256;
-	UpdateBankingCache(system_state.banking);
 	blitter->gram_mid_bits = rand() % 4;
 }
 
@@ -1411,37 +1371,17 @@ void refreshScreen() {
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
 
 	// Center 128x128 on 256x192
-	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;  // = 64
-	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2; // = 32
+	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;
+	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2;
 
-	// Optimized pixel conversion: process 2 pixels at a time
-	// Inline the ARGB->RGB15 conversion to avoid function call overhead
 	for (int y = 0; y < GT_HEIGHT; y++) {
-		uint32_t* srcRow = &srcPixels[(srcY + y) * vRAM_Surface->w];
-		uint16_t* dstRow = &dsVram[(yOff + y) * NDS_SCREEN_WIDTH + xOff];
-
-		// Process 128 pixels as 64 pairs (2 pixels per iteration)
+		int srcRow = (srcY + y) * vRAM_Surface->w;
+		int dstRow = (yOff + y) * NDS_SCREEN_WIDTH + xOff;
 		for (int x = 0; x < GT_WIDTH; x += 2) {
-			// Load two 32-bit pixels at once
-			uint32_t pixel1 = srcRow[x];
-			uint32_t pixel2 = srcRow[x + 1];
-
-			// Convert pixel1: extract RGB and shift to 5-bit components
-			// ARGB format: 0xFFRRGGBB -> RGB15: 1bbbbbgggggrrrrr
-			uint16_t r1 = (pixel1 >> 16) & 0xFF;
-			uint16_t g1 = (pixel1 >> 8) & 0xFF;
-			uint16_t b1 = pixel1 & 0xFF;
-			uint16_t rgb15_1 = ((b1 >> 3) << 10) | ((g1 >> 3) << 5) | (r1 >> 3) | 0x8000;
-
-			// Convert pixel2
-			uint16_t r2 = (pixel2 >> 16) & 0xFF;
-			uint16_t g2 = (pixel2 >> 8) & 0xFF;
-			uint16_t b2 = pixel2 & 0xFF;
-			uint16_t rgb15_2 = ((b2 >> 3) << 10) | ((g2 >> 3) << 5) | (r2 >> 3) | 0x8000;
-
-			// Store both pixels
-			dstRow[x] = rgb15_1;
-			dstRow[x + 1] = rgb15_2;
+			uint32_t pixel1 = srcPixels[srcRow + x];
+			uint32_t pixel2 = srcPixels[srcRow + x + 1];
+			dsVram[dstRow + x] = argb_to_rgb15(pixel1);
+			dsVram[dstRow + x + 1] = argb_to_rgb15(pixel2);
 		}
 	}
 #else
@@ -2021,10 +1961,7 @@ int main(int argC, char* argV[]) {
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
 	cpu_core = new mos6502(MemoryRead, MemoryWrite, CPUStopped, MemorySync);
-
-	// Initialize banking cache from current banking register
-	UpdateBankingCache(system_state.banking);
-	// Note: cpu_core->Reset() is called after ROM is loaded (needs reset vector from ROM)
+	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
 #ifdef NDS_BUILD
@@ -2083,9 +2020,6 @@ int main(int argC, char* argV[]) {
 			rom_file_name = NULL;
 		}
 	}
-
-	// Reset CPU after ROM is loaded (needs reset vector from ROM)
-	cpu_core->Reset();
 
 	if(!rom_file_name) {
 		paused = true;

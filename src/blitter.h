@@ -40,10 +40,7 @@ private:
     bool irq;
     bool running;
 
-    uint32_t last_updated_cycle = 0;
-
-    // Internal cycle processing - separated to enable batching optimization
-    inline void ProcessCycle(uint8_t &colorbus);
+    uint64_t last_updated_cycle = 0;
 
 public:
     static const uint8_t PARAM_VX      = 0;
@@ -56,12 +53,12 @@ public:
     static const uint8_t PARAM_COLOR   = 7;
 
     bool instant_mode = false;
-    uint32_t pixels_this_frame = 0;
+    uint64_t pixels_this_frame = 0;
     
     uint8_t gram_mid_bits;
 
     Blitter(mos6502*& cpu_core, Timekeeper* timekeeper, SystemState* system_state, SDL_Surface*& vram_surface) : cpu_core(cpu_core), timekeeper(timekeeper), system_state(system_state), vram_surface(vram_surface) {};
 
     void SetParam(uint8_t address, uint8_t value);
-    void CatchUp(uint32_t cycles=0);
+    void CatchUp(uint64_t cycles=0);
 };

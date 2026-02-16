@@ -13,15 +13,15 @@ enum ClockMode {
 
 class Timekeeper {
 public:
-    uint32_t system_clock = 315000000/88;  // ~3.58MHz fits in 32 bits
-    uint32_t actual_cycles = 0;
-    uint32_t cycles_since_vsync = 0;
-    uint32_t cycles_per_vsync = system_clock / 60;
+    uint64_t system_clock = 315000000/88;
+    uint64_t actual_cycles = 0;
+    uint64_t cycles_since_vsync = 0;
+    uint64_t cycles_per_vsync = system_clock / 60;
     double time_scaling = INITIAL_TIME_SCALING;
     double scaling_increment = INITIAL_SCALING_INCREMENT;
     uint32_t lastTicks = 0, currentTicks;
     uint8_t frameCount = 0;
     bool prev_overlong = false;
-    uint64_t totalCyclesCount = 0;  // Keep 64-bit for total to avoid overflow over long sessions
+    uint64_t totalCyclesCount = 0;
     ClockMode clock_mode = CLOCKMODE_NORMAL;
 };

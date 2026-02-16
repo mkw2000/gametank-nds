@@ -32,16 +32,9 @@ struct SystemState {
 
     uint8_t vram[VRAM_BUFFER_SIZE];
     uint8_t gram[GRAM_BUFFER_SIZE];
-
+    
     uint8_t VIA_regs[16];
 };
-
-// Cached banking offsets - defined in gte.cpp, updated when banking register changes
-extern uint32_t cached_ram_base;
-extern uint32_t cached_gram_base;
-extern uint32_t cached_vram_offset;
-extern bool cached_wrap_x;
-extern bool cached_wrap_y;
 
 struct CartridgeState
 {
