@@ -1,6 +1,7 @@
 #include "SDL_inc.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <fstream>
 
 #include "audio_coprocessor.h"
@@ -24,13 +25,13 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 		case ACP_NMI:
 #ifdef NDS_BUILD
             state.cpu->NMI();
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #else
             SDL_LockAudioDevice(state.device);
             state.cpu->NMI();
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #ifdef WRAPPER_MODE
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #endif
             SDL_UnlockAudioDevice(state.device);
 #endif
@@ -49,40 +50,44 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
     ACPState *state = (ACPState*) udata;
     uint16_t *stream16 = (uint16_t*) stream;
+    int numSamples = len / sizeof(uint16_t);
 
     // If emulation is paused, just fill buffer with zeroes without advancing the apu
     if (state->isEmulationPaused) {
-	for(int i = 0; i < len/sizeof(uint16_t); i++) {
-	    if(stream16 != NULL) {
-		stream16[i] = 0;
-	    }
-	}
-
-	return;
+        if(stream16 != NULL) {
+            memset(stream16, 0, numSamples * sizeof(uint16_t));
+        }
+        return;
     }
 
-    for(int i = 0; i < len/sizeof(uint16_t); i++) {
+    // Pre-calculate constants
+    uint8_t dacReg = state->dacReg;
+    int16_t sampleBase = ((int16_t)dacReg - 128) * (state->isMuted ? 0 : state->volume);
+    int32_t clksPerSample = state->clksPerHostSample;
+    int32_t irqRate = state->irqRate;
+    int32_t irqCounter = state->irqCounter;
+    uint32_t cycle_counter = 0;
+
+    for(int i = 0; i < numSamples; i++) {
         if(stream16 != NULL) {
-            stream16[i] = state->dacReg;
-            stream16[i] -= 128;
-            stream16[i] *= state->volume;
-            stream16[i] *= state->isMuted ? 0 : 1;
+            stream16[i] = sampleBase;
         }
-        state->irqCounter -= state->clksPerHostSample;
-        if(state->irqCounter < 0) {
+        irqCounter -= clksPerSample;
+        if(irqCounter < 0) {
             if(state->resetting) {
                 state->resetting = false;
                 state->cpu->Reset();
             }
-            state->irqCounter += state->irqRate;
-            state->cycle_counter = 0;
+            irqCounter += irqRate;
+            cycle_counter = 0;
             if(state->running) {
                 state->cpu->IRQ();
                 state->cpu->ClearIRQ();
-                state->cpu->Run(state->cycles_per_sample, state->cycle_counter);
+                state->cpu->RunOptimized(state->cycles_per_sample, cycle_counter);
             }
         }
     }
+    state->irqCounter = irqCounter;
 }
 
 ACPState* AudioCoprocessor::singleton_acp_state;
