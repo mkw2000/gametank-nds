@@ -1,0 +1,4 @@
+build_nds/
+*.elf
+*.nds
+*.map
