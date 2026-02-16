@@ -1644,11 +1644,11 @@ EM_BOOL mainloop(double time, void* userdata) {
 					break;
 			}
 			if(intended_cycles) {
-				cpu_core->Run(intended_cycles, timekeeper.totalCyclesCount);
+				cpu_core->RunOptimized(intended_cycles, timekeeper.totalCyclesCount);
 			}
 #else
 			intended_cycles = timekeeper.cycles_per_vsync;
-			cpu_core->Run(intended_cycles, timekeeper.totalCyclesCount);
+			cpu_core->RunOptimized(intended_cycles, timekeeper.totalCyclesCount);
 #endif
 			timekeeper.actual_cycles = timekeeper.totalCyclesCount - timekeeper.actual_cycles;
 			if(cpu_core->illegalOpcode) {
