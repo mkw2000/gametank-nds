@@ -2024,7 +2024,7 @@ int main(int argC, char* argV[]) {
 
 	// Initialize banking cache from current banking register
 	UpdateBankingCache(system_state.banking);
-	cpu_core->Reset();
+	// Note: cpu_core->Reset() is called after ROM is loaded (needs reset vector from ROM)
 	cartridge_state.write_mode = false;
 
 #ifdef NDS_BUILD
@@ -2083,6 +2083,9 @@ int main(int argC, char* argV[]) {
 			rom_file_name = NULL;
 		}
 	}
+
+	// Reset CPU after ROM is loaded (needs reset vector from ROM)
+	cpu_core->Reset();
 
 	if(!rom_file_name) {
 		paused = true;
