@@ -250,7 +250,17 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 
 #define RAM_HIGHBITS_SHIFT 7
 
-#define FULL_RAM_ADDRESS(x) (((system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT) | (x))
+// Use cached RAM base for faster computation
+#define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
+
+// Cached banking values to avoid recomputing on every access
+static uint32_t cached_ram_base = 0;
+static uint8_t cached_gram_bank = 0;
+
+static inline void UpdateBankingCache() {
+    cached_ram_base = (system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
+    cached_gram_bank = system_state.banking & BANK_GRAM_MASK;
+}
 
 extern unsigned char font_map[];
 
@@ -596,6 +606,7 @@ void MemoryWrite(uint16_t address, uint8_t value) {
 			} else if((address & 0x000F) == 0x0005) {
 				blitter->CatchUp();
 				system_state.banking = value;
+				UpdateBankingCache();
 				//printf("banking reg set to %x\n", value);
 			} else {
 				soundcard->register_write(address, value);
@@ -648,6 +659,7 @@ void randomize_memory() {
 	system_state.dma_control = rand() % 256;
 	system_state.dma_control_irq = (system_state.dma_control & DMA_COPY_IRQ_BIT) != 0;
 	system_state.banking = rand() % 256;
+	UpdateBankingCache();
 	blitter->gram_mid_bits = rand() % 4;
 }
 
@@ -1969,6 +1981,9 @@ int main(int argC, char* argV[]) {
 	for(int i = 0; i < cartridge_state.size; i++) {
 		cartridge_state.rom[i] = 0;
 	}
+
+	// Initialize banking cache with default values
+	UpdateBankingCache();
 
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
