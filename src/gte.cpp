@@ -257,16 +257,13 @@ uint32_t cached_vram_offset = 0;
 bool cached_wrap_x = false;
 bool cached_wrap_y = false;
 
-// Fast RAM address using cached base
-#define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
+// Use original banking calculation
+#define FULL_RAM_ADDRESS(x) (((system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT) | (x))
 
 // Update cached banking values when $2005 is written
 inline void UpdateBankingCache(uint8_t banking_value) {
-	cached_ram_base = (banking_value & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
-	cached_gram_base = ((banking_value & BANK_GRAM_MASK) << 16);
-	cached_vram_offset = (banking_value & BANK_VRAM_MASK) ? 0x4000 : 0;
-	cached_wrap_x = (banking_value & BANK_WRAPX_MASK) != 0;
-	cached_wrap_y = (banking_value & BANK_WRAPY_MASK) != 0;
+	// DISABLED - using original banking calculation
+	(void)banking_value;
 }
 
 extern unsigned char font_map[];
@@ -321,10 +318,12 @@ uint8_t VDMA_Read(uint16_t address) {
 		uint32_t offset = 0;
 		if(system_state.dma_control & DMA_CPU_TO_VRAM) {
 			bufPtr = system_state.vram;
-			offset = cached_vram_offset;
+			if(system_state.banking & BANK_VRAM_MASK) {
+				offset = 0x4000;
+			}
 		} else {
 			bufPtr = system_state.gram;
-			offset = ((cached_gram_base >> 14) | (blitter->gram_mid_bits)) << 14;
+			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
 		}
 		return bufPtr[(address & 0x3FFF) | offset];
 	}
@@ -342,14 +341,15 @@ void VDMA_Write(uint16_t address, uint8_t value) {
 		if(system_state.dma_control & DMA_CPU_TO_VRAM) {
 			bufPtr = system_state.vram;
 			targetSurface = vRAM_Surface;
-			offset = cached_vram_offset;
-			yShift = cached_vram_offset ? GT_HEIGHT : 0;
+			if(system_state.banking & BANK_VRAM_MASK) {
+				offset = 0x4000;
+				yShift = GT_HEIGHT;
+			}
 		} else {
 			bufPtr = system_state.gram;
 			targetSurface = gRAM_Surface;
-			uint32_t gram_page = (cached_gram_base >> 14) | (blitter->gram_mid_bits);
-			yShift = gram_page * GT_HEIGHT;
-			offset = gram_page << 14;
+			yShift = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) * GT_HEIGHT;
+			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
 		}
 		bufPtr[(address & 0x3FFF) | offset] = value;
 

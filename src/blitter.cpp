@@ -101,9 +101,9 @@ inline void Blitter::ProcessCycle(uint8_t &colorbus) {
         if(system_state->dma_control & DMA_COLORFILL_ENABLE_BIT) {
             colorbus = ~(params[PARAM_COLOR]);
         } else {
-            uint32_t gOffset = cached_gram_base +
-                    ((counterGY & 0x80) << 8) +  // !!(counterGY & 0x80) << 15 = (counterGY & 0x80) << 8
-                    ((counterGX & 0x80) << 7);   // !!(counterGX & 0x80) << 14 = (counterGX & 0x80) << 7
+            uint32_t gOffset = ((system_state->banking & BANK_GRAM_MASK) << 16) +
+                    (!!(counterGY & 0x80) << 15) +
+                    (!!(counterGX & 0x80) << 14);
             colorbus = system_state->gram[((counterGY & 0x7F) << 7) | (counterGX & 0x7F) | gOffset];
         }
 
@@ -111,12 +111,10 @@ inline void Blitter::ProcessCycle(uint8_t &colorbus) {
         counterGY = ydir ? ~counterGY : counterGY;
 
         if(system_state->dma_control & DMA_COPY_ENABLE_BIT) {
-            bool transparency = (system_state->dma_control & DMA_TRANSPARENCY_BIT) || (colorbus != 0);
-            bool offscreen_x = (counterVX & 0x80) && cached_wrap_x;
-            bool offscreen_y = (counterVY & 0x80) && cached_wrap_y;
-
-            if(transparency && !offscreen_x && !offscreen_y) {
-                int yShift = cached_vram_offset ? 128 : 0;
+            if(((system_state->dma_control & DMA_TRANSPARENCY_BIT) || (colorbus != 0))
+                && !((counterVX & 0x80) && (system_state->banking & BANK_WRAPX_MASK))
+                && !((counterVY & 0x80) && system_state->banking & BANK_WRAPY_MASK)) {
+                int yShift = (system_state->banking & BANK_VRAM_MASK) ? 128 : 0;
                 int vOffset = yShift << 7;
                 system_state->vram[((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset] = colorbus;
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
