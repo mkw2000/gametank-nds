@@ -20,8 +20,16 @@ Uint32 Palette::ConvertColor(SDL_Surface* target, uint8_t index) {
 }
 
 #ifdef NDS_BUILD
+uint16_t Palette::rgb15_lut[1024];
+
+void Palette::InitRGB15LUT() {
+    for(int i = 0; i < 1024; i++) {
+        RGB_Color c = ((RGB_Color*)gt_palette_vals)[i];
+        rgb15_lut[i] = RGB15(c.r >> 3, c.g >> 3, c.b >> 3) | BIT(15);
+    }
+}
+
 uint16_t Palette::ConvertColorRGB15(uint8_t index) {
-	RGB_Color c = ((RGB_Color*)gt_palette_vals)[index + palette_select];
-	return RGB15(c.r >> 3, c.g >> 3, c.b >> 3) | BIT(15);
+	return rgb15_lut[index + palette_select];
 }
 #endif

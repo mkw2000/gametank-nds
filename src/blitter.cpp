@@ -163,7 +163,7 @@ void Blitter::ProcessBatch(uint64_t cycles) {
                 uint8_t colorbus = *srcPtr++;
                 if (!transparency || colorbus != 0) {
                     *dstPtr = colorbus;
-                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
+                    *dst15Ptr = Palette::rgb15_lut[colorbus + palette_select];
                 }
                 dstPtr++;
                 dst15Ptr++;
@@ -239,7 +239,7 @@ void Blitter::ProcessBatch(uint64_t cycles) {
                 && !((counterVY & 0x80) && wrapY)) {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
-                system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
+                system_state->vram_rgb15[vramIndex] = Palette::rgb15_lut[colorbus + palette_select];
 #ifndef NDS_BUILD
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
 #endif

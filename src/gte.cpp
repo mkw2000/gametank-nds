@@ -1901,6 +1901,7 @@ int main(int argC, char* argV[]) {
 #ifdef NDS_BUILD
 	// NDS: initialize hardware
 	defaultExceptionHandler();
+	Palette::InitRGB15LUT();
 
 	// Set up top screen for bitmap output (main engine)
 	videoSetMode(MODE_5_2D);
