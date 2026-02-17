@@ -61,4 +61,10 @@ public:
 
     void SetParam(uint8_t address, uint8_t value);
     void CatchUp(uint64_t cycles=0);
+
+private:
+    // Single cycle processing - extracts one row from the blitter state machine
+    void ProcessCycle();
+    // Fast path: process multiple cycles at once when blitter is in steady state
+    void ProcessBatch(uint64_t cycles);
 };
