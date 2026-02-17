@@ -22,7 +22,6 @@ case 0X0A: { src = Addr_ACC(); Op_ASL_ACC(src); elapsedCycles = 2; break; }
 case 0X16: { src = Addr_ZEX(); Op_ASL(src); elapsedCycles = 6; break; }
 case 0X1E: { src = Addr_ABX(); Op_ASL(src); elapsedCycles = 6; break; }
 case 0X90: { src = Addr_REL(); Op_BCC(src); elapsedCycles = 2; break; }
-case 0XB0: { src = Addr_REL(); Op_BCS(src); elapsedCycles = 2; break; }
 case 0XF0: { src = Addr_REL(); Op_BEQ(src); elapsedCycles = 2; break; }
 case 0X80: { src = Addr_REL(); Op_BRA(src); elapsedCycles = 3; break; }
 case 0X2C: { src = Addr_ABS(); Op_BIT(src); elapsedCycles = 4; break; }
@@ -61,7 +60,6 @@ case 0XD6: { src = Addr_ZEX(); Op_DEC(src); elapsedCycles = 6; break; }
 case 0XDE: { src = Addr_ABX(); Op_DEC(src); elapsedCycles = 7; break; }
 case 0XCA: { src = Addr_IMP(); Op_DEX(src); elapsedCycles = 2; break; }
 case 0X88: { src = Addr_IMP(); Op_DEY(src); elapsedCycles = 2; break; }
-case 0X49: { src = Addr_IMM(); Op_EOR(src); elapsedCycles = 2; break; }
 case 0X4D: { src = Addr_ABS(); Op_EOR(src); elapsedCycles = 4; break; }
 case 0X45: { src = Addr_ZER(); Op_EOR(src); elapsedCycles = 3; break; }
 case 0X41: { src = Addr_INX(); Op_EOR(src); elapsedCycles = 6; break; }
@@ -119,7 +117,6 @@ case 0X08: { src = Addr_IMP(); Op_PHP(src); elapsedCycles = 3; break; }
 case 0XDA: { src = Addr_IMP(); Op_PHX(src); elapsedCycles = 3; break; }
 case 0X5A: { src = Addr_IMP(); Op_PHY(src); elapsedCycles = 3; break; }
 case 0X68: { src = Addr_IMP(); Op_PLA(src); elapsedCycles = 4; break; }
-case 0X28: { src = Addr_IMP(); Op_PLP(src); elapsedCycles = 4; break; }
 case 0XFA: { src = Addr_IMP(); Op_PLX(src); elapsedCycles = 4; break; }
 case 0X7A: { src = Addr_IMP(); Op_PLY(src); elapsedCycles = 4; break; }
 case 0X2E: { src = Addr_ABS(); Op_ROL(src); elapsedCycles = 6; break; }

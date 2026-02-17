@@ -224,6 +224,8 @@ private:
 
 	inline uint8_t ReadBus(uint16_t address);
 	inline void WriteBus(uint16_t address, uint8_t value);
+	inline uint8_t FetchByte();
+	inline void SetNZFast(uint8_t value);
 	inline void FlushRunCycles();
 
 	// stack operations

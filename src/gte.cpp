@@ -1234,32 +1234,32 @@ static void NDSPerfMaybePrint() {
 	}
 
 	// Keep output on a dedicated block of lines on the sub-screen console.
+	// Keep each line <= 32 chars to avoid wrap/scroll corruption.
 	printf("\x1b[18;0H");
-	printf("Perf: %6lu us  %3lu%% realtime    \n",
+	printf("P:%5luus RT:%3lu%%             \n",
 		(unsigned long)avgUs,
 		(unsigned long)speedPct);
-	printf("CPU  %3lu%%  BLIT %3lu%%  REN %3lu%% \n",
+	printf("C:%2lu B:%2lu R:%2lu A:%2lu I:%2lu      \n",
 		(unsigned long)cpuPct,
 		(unsigned long)blitPct,
-		(unsigned long)renderPct);
-	printf("AUD  %3lu%%  IN   %3lu%%            \n",
+		(unsigned long)renderPct,
 		(unsigned long)audioPct,
 		(unsigned long)inputPct);
 	if (cpuDelta > 0 && topOpCycles[0] > 0) {
 		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / cpuDelta);
 		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / cpuDelta);
 		const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / cpuDelta);
-		printf("OP1 %02X %2lu%% OP2 %02X %2lu%%     \n",
+		printf("OP:%02X %2lu %02X %2lu %02X %2lu      \n",
 			(unsigned int)topOps[0], (unsigned long)p0,
-			(unsigned int)topOps[1], (unsigned long)p1);
-		printf("OP3 %02X %2lu%% E:%5lu/%5lu/%5lu \n",
-			(unsigned int)topOps[2], (unsigned long)p2,
-			(unsigned long)topOpExec[0],
-			(unsigned long)topOpExec[1],
-			(unsigned long)topOpExec[2]);
+			(unsigned int)topOps[1], (unsigned long)p1,
+			(unsigned int)topOps[2], (unsigned long)p2);
+		printf("EX:%4lu/%4lu/%4lu            \n",
+			(unsigned long)(topOpExec[0] > 9999 ? 9999 : topOpExec[0]),
+			(unsigned long)(topOpExec[1] > 9999 ? 9999 : topOpExec[1]),
+			(unsigned long)(topOpExec[2] > 9999 ? 9999 : topOpExec[2]));
 	} else {
-		printf("OP1 -- -- OP2 -- --              \n");
-		printf("OP3 -- -- E:    0/    0/    0    \n");
+		printf("OP:-- -- -- -- -- --          \n");
+		printf("EX:   0/   0/   0             \n");
 	}
 }
 

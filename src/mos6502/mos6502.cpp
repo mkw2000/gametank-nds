@@ -1048,6 +1048,41 @@ inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 	(*Write)(address, value);
 }
 
+inline uint8_t mos6502::FetchByte()
+{
+	const uint16_t address = pc++;
+#if defined(NDS_BUILD) && defined(ARM9)
+	// Instruction stream is usually ROM; keep this path as lean as possible.
+	if (address & 0x8000) {
+		if (loadedRomType == RomType::FLASH2M) {
+			if (address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
+			return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+		}
+		if (loadedRomType == RomType::FLASH2M_RAM32K) {
+			if (address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
+			if(!(cartridge_state.bank_mask & 0x80)) {
+				return cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
+			}
+			return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+		}
+		if (loadedRomType == RomType::EEPROM32K) return cartridge_state.rom[address & 0x7FFF];
+		if (loadedRomType == RomType::EEPROM8K) return cartridge_state.rom[address & 0x1FFF];
+	}
+
+	if (address < 0x2000) {
+		return system_state.ram[cached_ram_base | address];
+	}
+#endif
+	return ReadBus(address);
+}
+
+inline void mos6502::SetNZFast(uint8_t value)
+{
+	status = (status & (uint8_t)~(NEGATIVE | ZERO)) |
+		(uint8_t)(value & NEGATIVE) |
+		(uint8_t)((value == 0) ? ZERO : 0);
+}
+
 inline void mos6502::FlushRunCycles()
 {
 	if(run_cycle_target && run_pending_cycles) {
@@ -1406,7 +1441,7 @@ void mos6502::Run(
 		}
 		// fetch
 		if(Sync == NULL) {
-			opcode = ReadBus(pc++);
+			opcode = FetchByte();
 		} else {
 			opcode = Sync(pc++);
 		}
@@ -1419,6 +1454,31 @@ void mos6502::Run(
 		// Direct opcode dispatch on ARM9 avoids per-instruction member function pointer indirection.
 #if defined(NDS_BUILD) && defined(ARM9)
 		switch(opcode) {
+			case 0x49: { // EOR IMM
+				A ^= FetchByte();
+				SetNZFast(A);
+				elapsedCycles = 2;
+				break;
+			}
+			case 0xB0: { // BCS REL
+				uint16_t off = (uint16_t)ReadBus(pc++);
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (IF_CARRY()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x28: { // PLP
+				status = StackPop();
+				status |= CONSTANT;
+				status &= ~BREAK;
+				elapsedCycles = 4;
+				break;
+			}
 #include "mos6502_dispatch_cases.inc"
 			default: {
 				src = Addr_IMP();
