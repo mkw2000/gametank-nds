@@ -1212,7 +1212,7 @@ void mos6502::Reset()
 	return;
 }
 
-ITCM_CODE void mos6502::StackPush(uint8_t byte)
+void mos6502::StackPush(uint8_t byte)
 {
 	Write(0x0100 + sp, byte);
 	if(sp == 0x00) sp = 0xFF;
@@ -1226,7 +1226,7 @@ ITCM_CODE uint8_t mos6502::StackPop()
 	return Read(0x0100 + sp);
 }
 
-ITCM_CODE void mos6502::IRQ()
+void mos6502::IRQ()
 {
 	irq_line = true;
 	waiting = false;
@@ -1256,7 +1256,7 @@ ITCM_CODE void mos6502::ClearIRQ() {
 	irq_timer = 0;
 }
 
-ITCM_CODE void mos6502::NMI()
+void mos6502::NMI()
 {
 	waiting = false;
 	SET_BREAK(0);
@@ -1413,7 +1413,7 @@ ITCM_CODE void mos6502::Op_AND(uint16_t src)
 }
 
 
-ITCM_CODE void mos6502::Op_ASL(uint16_t src)
+void mos6502::Op_ASL(uint16_t src)
 {
 	uint8_t m = Read(src);
 	SET_CARRY(m & 0x80);
@@ -1425,7 +1425,7 @@ ITCM_CODE void mos6502::Op_ASL(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_ASL_ACC(uint16_t src)
+void mos6502::Op_ASL_ACC(uint16_t src)
 {
 	uint8_t m = A;
 	SET_CARRY(m & 0x80);
@@ -1747,7 +1747,7 @@ ITCM_CODE void mos6502::Op_LDY(uint16_t src)
 	Y = m;
 }
 
-ITCM_CODE void mos6502::Op_LSR(uint16_t src)
+void mos6502::Op_LSR(uint16_t src)
 {
 	uint8_t m = Read(src);
 	SET_CARRY(m & 0x01);
@@ -1757,7 +1757,7 @@ ITCM_CODE void mos6502::Op_LSR(uint16_t src)
 	Write(src, m);
 }
 
-ITCM_CODE void mos6502::Op_LSR_ACC(uint16_t src)
+void mos6502::Op_LSR_ACC(uint16_t src)
 {
 	uint8_t m = A;
 	SET_CARRY(m & 0x01);
@@ -1781,7 +1781,7 @@ ITCM_CODE void mos6502::Op_ORA(uint16_t src)
 	A = m;
 }
 
-ITCM_CODE void mos6502::Op_PHA(uint16_t src)
+void mos6502::Op_PHA(uint16_t src)
 {
 	StackPush(A);
 	return;
@@ -1793,19 +1793,19 @@ void mos6502::Op_PHP(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_PHX(uint16_t src)
+void mos6502::Op_PHX(uint16_t src)
 {
 	StackPush(X);
 	return;
 }
 
-ITCM_CODE void mos6502::Op_PHY(uint16_t src)
+void mos6502::Op_PHY(uint16_t src)
 {
 	StackPush(Y);
 	return;
 }
 
-ITCM_CODE void mos6502::Op_PLA(uint16_t src)
+void mos6502::Op_PLA(uint16_t src)
 {
 	A = StackPop();
 	SET_NEGATIVE(A & 0x80);
@@ -1820,7 +1820,7 @@ void mos6502::Op_PLP(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_PLX(uint16_t src)
+void mos6502::Op_PLX(uint16_t src)
 {
 	X = StackPop();
 	SET_NEGATIVE(X & 0x80);
@@ -1828,7 +1828,7 @@ ITCM_CODE void mos6502::Op_PLX(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_PLY(uint16_t src)
+void mos6502::Op_PLY(uint16_t src)
 {
 	Y = StackPop();
 	SET_NEGATIVE(Y & 0x80);
@@ -1836,7 +1836,7 @@ ITCM_CODE void mos6502::Op_PLY(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_ROL(uint16_t src)
+void mos6502::Op_ROL(uint16_t src)
 {
 	uint16_t m = Read(src);
 	m <<= 1;
@@ -1849,7 +1849,7 @@ ITCM_CODE void mos6502::Op_ROL(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_ROL_ACC(uint16_t src)
+void mos6502::Op_ROL_ACC(uint16_t src)
 {
 	uint16_t m = A;
 	m <<= 1;
@@ -1862,7 +1862,7 @@ ITCM_CODE void mos6502::Op_ROL_ACC(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_ROR(uint16_t src)
+void mos6502::Op_ROR(uint16_t src)
 {
 	uint16_t m = Read(src);
 	if (IF_CARRY()) m |= 0x100;
@@ -1875,7 +1875,7 @@ ITCM_CODE void mos6502::Op_ROR(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_ROR_ACC(uint16_t src)
+void mos6502::Op_ROR_ACC(uint16_t src)
 {
 	uint16_t m = A;
 	if (IF_CARRY()) m |= 0x100;
@@ -1888,7 +1888,7 @@ ITCM_CODE void mos6502::Op_ROR_ACC(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_RTI(uint16_t src)
+void mos6502::Op_RTI(uint16_t src)
 {
 	uint8_t lo, hi;
 
@@ -1978,7 +1978,7 @@ ITCM_CODE void mos6502::Op_STY(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TAX(uint16_t src)
+void mos6502::Op_TAX(uint16_t src)
 {
 	uint8_t m = A;
 	SET_NEGATIVE(m & 0x80);
@@ -1987,7 +1987,7 @@ ITCM_CODE void mos6502::Op_TAX(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TAY(uint16_t src)
+void mos6502::Op_TAY(uint16_t src)
 {
 	uint8_t m = A;
 	SET_NEGATIVE(m & 0x80);
@@ -1996,7 +1996,7 @@ ITCM_CODE void mos6502::Op_TAY(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TSX(uint16_t src)
+void mos6502::Op_TSX(uint16_t src)
 {
 	uint8_t m = sp;
 	SET_NEGATIVE(m & 0x80);
@@ -2005,7 +2005,7 @@ ITCM_CODE void mos6502::Op_TSX(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TXA(uint16_t src)
+void mos6502::Op_TXA(uint16_t src)
 {
 	uint8_t m = X;
 	SET_NEGATIVE(m & 0x80);
@@ -2014,13 +2014,13 @@ ITCM_CODE void mos6502::Op_TXA(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TXS(uint16_t src)
+void mos6502::Op_TXS(uint16_t src)
 {
 	sp = X;
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TYA(uint16_t src)
+void mos6502::Op_TYA(uint16_t src)
 {
 	uint8_t m = Y;
 	SET_NEGATIVE(m & 0x80);
@@ -2029,7 +2029,7 @@ ITCM_CODE void mos6502::Op_TYA(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_BRA(uint16_t src)
+void mos6502::Op_BRA(uint16_t src)
 {
 	// An extra cycle is required if a page boundary is crossed
 	if (!addressesSamePage(pc, src)) opExtraCycles++;
@@ -2038,7 +2038,7 @@ ITCM_CODE void mos6502::Op_BRA(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_TRB(uint16_t src)
+void mos6502::Op_TRB(uint16_t src)
 {
 	uint8_t m = Read(src);
 	SET_ZERO(m & A);
@@ -2046,7 +2046,7 @@ ITCM_CODE void mos6502::Op_TRB(uint16_t src)
 	Write(src, m);
 }
 
-ITCM_CODE void mos6502::Op_TSB(uint16_t src)
+void mos6502::Op_TSB(uint16_t src)
 {
 	uint8_t m = Read(src);
 	SET_ZERO(m & A);
@@ -2054,7 +2054,7 @@ ITCM_CODE void mos6502::Op_TSB(uint16_t src)
 	Write(src, m);
 }
 
-ITCM_CODE void mos6502::Op_BBRx(uint8_t mask, uint8_t val, uint16_t offset)
+void mos6502::Op_BBRx(uint8_t mask, uint8_t val, uint16_t offset)
 {
 	uint16_t addr;
 
@@ -2072,7 +2072,7 @@ ITCM_CODE void mos6502::Op_BBRx(uint8_t mask, uint8_t val, uint16_t offset)
 	}
 }
 
-ITCM_CODE void mos6502::Op_BBR0(uint16_t src)
+void mos6502::Op_BBR0(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2080,7 +2080,7 @@ ITCM_CODE void mos6502::Op_BBR0(uint16_t src)
 	Op_BBRx(0x01, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR1(uint16_t src)
+void mos6502::Op_BBR1(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2088,7 +2088,7 @@ ITCM_CODE void mos6502::Op_BBR1(uint16_t src)
 	Op_BBRx(0x02, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR2(uint16_t src)
+void mos6502::Op_BBR2(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2096,7 +2096,7 @@ ITCM_CODE void mos6502::Op_BBR2(uint16_t src)
 	Op_BBRx(0x04, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR3(uint16_t src)
+void mos6502::Op_BBR3(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2104,7 +2104,7 @@ ITCM_CODE void mos6502::Op_BBR3(uint16_t src)
 	Op_BBRx(0x08, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR4(uint16_t src)
+void mos6502::Op_BBR4(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2112,7 +2112,7 @@ ITCM_CODE void mos6502::Op_BBR4(uint16_t src)
 	Op_BBRx(0x10, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR5(uint16_t src)
+void mos6502::Op_BBR5(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2120,7 +2120,7 @@ ITCM_CODE void mos6502::Op_BBR5(uint16_t src)
 	Op_BBRx(0x20, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR6(uint16_t src)
+void mos6502::Op_BBR6(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2128,7 +2128,7 @@ ITCM_CODE void mos6502::Op_BBR6(uint16_t src)
 	Op_BBRx(0x40, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBR7(uint16_t src)
+void mos6502::Op_BBR7(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2136,7 +2136,7 @@ ITCM_CODE void mos6502::Op_BBR7(uint16_t src)
 	Op_BBRx(0x80, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBSx(uint8_t mask, uint8_t val, uint16_t offset)
+void mos6502::Op_BBSx(uint8_t mask, uint8_t val, uint16_t offset)
 {
 	uint16_t addr;
 

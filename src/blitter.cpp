@@ -1,4 +1,10 @@
 #include "blitter.h"
+#ifdef NDS_BUILD
+#include "nds_platform.h"
+#endif
+#ifndef ITCM_CODE
+#define ITCM_CODE
+#endif
 
 Uint32 get_pixel32( SDL_Surface *surface, int x, int y )
 {
@@ -9,7 +15,7 @@ Uint32 get_pixel32( SDL_Surface *surface, int x, int y )
     return pixels[ ( y * surface->w ) + x ];
 }
 
-void put_pixel32( SDL_Surface *surface, int x, int y, Uint32 pixel )
+void ITCM_CODE put_pixel32( SDL_Surface *surface, int x, int y, Uint32 pixel )
 {
     if(!surface) return;
     //Convert the pixels to 32 bit
@@ -51,7 +57,7 @@ static inline uint32_t ComputeGOffset(SystemState* system_state, uint8_t counter
 }
 
 // Process a single blitter cycle - the core state machine
-void Blitter::ProcessCycle() {
+void ITCM_CODE Blitter::ProcessCycle() {
     //PHASE 0: Decrement Width Counter or Load if INIT
     if(running) {
         --counterW;
@@ -115,7 +121,9 @@ void Blitter::ProcessCycle() {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
                 system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
+#ifndef NDS_BUILD
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
+#endif
             }
             ++pixels_this_frame;
         }
@@ -123,7 +131,7 @@ void Blitter::ProcessCycle() {
 }
 
 // Fast path: batch process entire rows when blitter is in steady state
-void Blitter::ProcessBatch(uint64_t cycles) {
+void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
     // Pre-compute constants for the batch
     const bool xDir = XDIR;
     const bool yDir = YDIR;
@@ -394,7 +402,7 @@ void Blitter::ProcessBatch(uint64_t cycles) {
     }
 }
 
-void Blitter::CatchUp(uint64_t cycles) {
+void ITCM_CODE Blitter::CatchUp(uint64_t cycles) {
     if(cycles == 0) {
         cycles = timekeeper->totalCyclesCount - last_updated_cycle;
     }
