@@ -2064,6 +2064,8 @@ int main(int argC, char* argV[]) {
 	while(running) {
 		for (int f = 0; f < ndsFrameSkip && running; f++) {
 			ndsFrameCounter = f;
+			// Suppress blitter VRAM writes on skipped frames (still emulates, just doesn't draw)
+			blitter->suppress_output = (f != ndsFrameSkip - 1);
 			mainloop(0, NULL);
 		}
 		swiWaitForVBlank();

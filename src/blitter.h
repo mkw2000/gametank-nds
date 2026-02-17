@@ -54,8 +54,11 @@ public:
 
     bool instant_mode = false;
     uint64_t pixels_this_frame = 0;
-    
+
     uint8_t gram_mid_bits;
+
+    // Frame skip optimization: when true, blitter computes but doesn't write to VRAM/surface
+    bool suppress_output = false;
 
     Blitter(mos6502*& cpu_core, Timekeeper* timekeeper, SystemState* system_state, SDL_Surface*& vram_surface) : cpu_core(cpu_core), timekeeper(timekeeper), system_state(system_state), vram_surface(vram_surface) {};
 
