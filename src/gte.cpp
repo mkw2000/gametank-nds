@@ -434,6 +434,14 @@ uint8_t MemoryRead(uint16_t address) {
 	return MemoryReadResolve(address, true);
 }
 
+// Fast path for the main CPU: zero page reads bypass MemoryReadResolve entirely
+inline uint8_t MemoryReadFast(uint16_t address) {
+	if(address < 0x100) {
+		return system_state.ram[FULL_RAM_ADDRESS(address)];
+	}
+	return MemoryReadResolve(address, true);
+}
+
 uint8_t MemorySync(uint16_t address) {
 #if !defined(NDS_BUILD) && !defined(WASM_BUILD)
 	if(timekeeper.clock_mode == CLOCKMODE_NORMAL) {
@@ -1957,7 +1965,7 @@ int main(int argC, char* argV[]) {
 
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
-	cpu_core = new mos6502(MemoryRead, MemoryWrite, CPUStopped, MemorySync);
+	cpu_core = new mos6502(MemoryReadFast, MemoryWrite, CPUStopped, MemorySync);
 	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
