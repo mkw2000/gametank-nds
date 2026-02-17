@@ -67,6 +67,7 @@ public:
 
     void SetParam(uint8_t address, uint8_t value);
     void CatchUp(uint64_t cycles=0);
+    inline bool IsBusy() const { return running || init || trigger; }
 
 private:
     // Single cycle processing - extracts one row from the blitter state machine

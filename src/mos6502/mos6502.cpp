@@ -9,6 +9,13 @@
 #define ITCM_CODE
 #endif
 
+#ifndef LIKELY
+#define LIKELY(x)   __builtin_expect(!!(x), 1)
+#endif
+#ifndef UNLIKELY
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
+
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
 extern CartridgeState cartridge_state;
@@ -1409,12 +1416,12 @@ void mos6502::Run(
 	Instr instr;
 #endif
 
-	if(freeze) return;
+	if (UNLIKELY(freeze)) return;
 
 	while((cyclesRemaining > 0) && !illegalOpcode)
 	{
-		if(waiting) {
-			if(irq_line) {
+		if (UNLIKELY(waiting)) {
+			if (UNLIKELY(irq_line)) {
 				waiting = false;
 				IRQ();
 			} else if(irq_timer > 0) {
@@ -1436,7 +1443,7 @@ void mos6502::Run(
 			} else {
 				break;
 			}
-		} else if(irq_line) {
+		} else if (UNLIKELY(irq_line)) {
 			IRQ();
 		}
 		// fetch
@@ -1445,7 +1452,7 @@ void mos6502::Run(
 		} else {
 			opcode = Sync(pc++);
 		}
-		if(freeze) {
+		if (UNLIKELY(freeze)) {
 			--pc;
 			cyclesRemaining = 0;
 			break;
@@ -1503,7 +1510,7 @@ void mos6502::Run(
 				break;
 			}
 			case 0xB0: { // BCS REL
-				uint16_t off = (uint16_t)ReadBus(pc++);
+				uint16_t off = (uint16_t)FetchByte();
 				if (off & 0x80) off |= 0xFF00;
 				const uint16_t target = pc + (int16_t)off;
 				if (IF_CARRY()) {
@@ -1514,8 +1521,90 @@ void mos6502::Run(
 				elapsedCycles = 2;
 				break;
 			}
+			case 0x90: { // BCC REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (!IF_CARRY()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0xF0: { // BEQ REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (IF_ZERO()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x10: { // BPL REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (!IF_NEGATIVE()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x30: { // BMI REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (IF_NEGATIVE()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x50: { // BVC REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (!IF_OVERFLOW()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x70: { // BVS REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (IF_OVERFLOW()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x80: { // BRA REL
+				uint16_t off = (uint16_t)FetchByte();
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (!addressesSamePage(pc, target)) opExtraCycles++;
+				pc = target;
+				opExtraCycles++;
+				elapsedCycles = 3;
+				break;
+			}
 			case 0xD0: { // BNE REL
-				uint16_t off = (uint16_t)ReadBus(pc++);
+				uint16_t off = (uint16_t)FetchByte();
 				if (off & 0x80) off |= 0xFF00;
 				const uint16_t target = pc + (int16_t)off;
 				if (!IF_ZERO()) {
@@ -1534,6 +1623,21 @@ void mos6502::Run(
 				StackPush((pc >> 8) & 0xFF);
 				StackPush(pc & 0xFF);
 				pc = target;
+				elapsedCycles = 6;
+				break;
+			}
+			case 0x4C: { // JMP ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				pc = (uint16_t)(lo | (hi << 8));
+				elapsedCycles = 3;
+				break;
+			}
+			case 0x60: { // RTS
+				const uint16_t lo = StackPop();
+				const uint16_t hi = StackPop();
+				pc = (uint16_t)((hi << 8) | lo);
+				pc++;
 				elapsedCycles = 6;
 				break;
 			}

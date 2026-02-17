@@ -398,6 +398,12 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
 }
 
 void ITCM_CODE Blitter::CatchUp(uint64_t cycles) {
+    if (!running && !init && !trigger) {
+        // Idle blitter: just resync timestamp, no per-cycle work required.
+        last_updated_cycle = timekeeper->totalCyclesCount;
+        return;
+    }
+
     if(cycles == 0) {
         cycles = timekeeper->totalCyclesCount - last_updated_cycle;
     }
