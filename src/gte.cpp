@@ -377,7 +377,7 @@ void UpdateFlashShiftRegister(uint8_t nextVal) {
 	}
 }
 
-uint8_t MemoryRead_Flash2M(uint16_t address) {
+uint8_t ITCM_CODE MemoryRead_Flash2M(uint16_t address) {
 	if(address & 0x4000) {
 		return cartridge_state.rom[0b111111100000000000000 | (address & 0x3FFF)];
 	} else {
@@ -387,7 +387,7 @@ uint8_t MemoryRead_Flash2M(uint16_t address) {
 	}
 }
 
-uint8_t MemoryRead_Unknown(uint16_t address) {
+uint8_t ITCM_CODE MemoryRead_Unknown(uint16_t address) {
 	//If cartridge_state.size is smaller than unbanked ROM range, align end with 0xFFFF and wrap
 	//If cartridge_state.size is bigger than unbanked ROM range, access mainWindow at end of file.
 	//TODO: Decide if unknown ROM type should just terminate emulator :P
@@ -398,11 +398,11 @@ uint8_t MemoryRead_Unknown(uint16_t address) {
 	}
 }
 
-uint8_t* GetRAM(const uint16_t address) {
+uint8_t* ITCM_CODE GetRAM(const uint16_t address) {
 	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
 }
 
-uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
+uint8_t ITCM_CODE MemoryReadResolve(const uint16_t address, bool stateful) {
 	if(address & 0x8000) {
 		switch(loadedRomType) {
 			case RomType::EEPROM8K:
@@ -437,13 +437,13 @@ uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 	return open_bus();
 }
 
-uint8_t MemoryRead(uint16_t address) {
+uint8_t ITCM_CODE MemoryRead(uint16_t address) {
 	return MemoryReadResolve(address, true);
 }
 
 // Fast path for the main CPU: zero page reads bypass MemoryReadResolve entirely
 uint8_t ITCM_CODE MemoryReadFast(uint16_t address) {
-	if(address < 0x100) {
+	if(address < 0x2000) {
 		return system_state.ram[FULL_RAM_ADDRESS(address)];
 	}
 	return MemoryReadResolve(address, true);
@@ -469,7 +469,7 @@ uint8_t MemorySync(uint16_t address) {
 	return MemoryRead(address);
 }
 
-void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
+void MemoryWrite(uint16_t address, uint8_t value) {
 	if(address & 0x8000) {
 		if(loadedRomType == RomType::FLASH2M_RAM32K) {
 			if(!(address & 0x4000)) {
