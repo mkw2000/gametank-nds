@@ -268,5 +268,8 @@ public:
 		int32_t cycles,
 		uint64_t& cycleCount,
 		CycleMethod cycleMethod = CYCLE_COUNT);
+	void RunOptimized(
+		int32_t cycles,
+		uint64_t& cycleCount);
 	void Freeze();
 };

@@ -2304,3 +2304,685 @@ void mos6502::Op_SMB7(uint16_t src)
 {
 	Op_SMBx(128, src);
 }
+
+void mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCount) {
+    uint8_t opcode;
+    uint8_t elapsedCycles;
+    uint16_t src;
+
+    if(freeze) return;
+
+    while((cyclesRemaining > 0) && !illegalOpcode) {
+        if(waiting) {
+            if(irq_line) {
+                waiting = false;
+                IRQ();
+            } else if(irq_timer > 0) {
+                if(cyclesRemaining >= (int32_t)irq_timer) {
+                    cycleCount += irq_timer;
+                    cyclesRemaining -= irq_timer;
+                    irq_timer = 0;
+                    if((irq_gate == NULL) || (*irq_gate)) {
+                        irq_line = true;
+                        IRQ();
+                    }
+                } else {
+                    irq_timer -= cyclesRemaining;
+                    cycleCount += cyclesRemaining;
+                    cyclesRemaining = 0;
+                    break;
+                }
+            } else {
+                break;
+            }
+        } else if(irq_line) {
+            IRQ();
+        }
+        if(Sync == NULL) {
+            opcode = Read(pc++);
+        } else {
+            opcode = Sync(pc++);
+        }
+        if(freeze) {
+            --pc;
+            cyclesRemaining = 0;
+            break;
+        }
+
+        elapsedCycles = 0;
+        switch(opcode) {
+
+        case 0x00: { // BRK
+            pc++;
+            StackPush((pc >> 8) & 0xFF);
+            StackPush(pc & 0xFF);
+            StackPush(status | BREAK);
+            SET_INTERRUPT(1);
+            pc = (Read(irqVectorH) << 8) + Read(irqVectorL);
+            elapsedCycles = 7; break;
+        }
+        case 0x01: { // ORA INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF;
+            src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 6; break;
+        }
+        case 0x04: { // TSB ZER
+            src = Read(pc++);
+            uint8_t m = Read(src); SET_ZERO(!(A & m)); m |= A; Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x05: { // ORA ZER
+            src = Read(pc++);
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 3; break;
+        }
+        case 0x06: { // ASL ZER
+            src = Read(pc++);
+            uint8_t m = Read(src); SET_CARRY(m & 0x80); m <<= 1; m &= 0xFF;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x07: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x01; Write(src, m); elapsedCycles = 5; break; } // RMB0
+        case 0x08: { StackPush(status | BREAK); elapsedCycles = 3; break; } // PHP
+        case 0x09: { src = pc++; A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // ORA IMM
+        case 0x0A: { SET_CARRY(A & 0x80); A <<= 1; A &= 0xFF; SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // ASL ACC
+        case 0x0C: { // TSB ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            uint8_t m = Read(src); SET_ZERO(!(A & m)); m |= A; Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x0D: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // ORA ABS
+        case 0x0E: { // ASL ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            uint8_t m = Read(src); SET_CARRY(m & 0x80); m <<= 1; m &= 0xFF;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x0F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x01, val, offset); elapsedCycles = 5; break; } // BBR0
+        case 0x10: { // BPL
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(!IF_NEGATIVE()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0x11: { // ORA INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x12: { // ORA ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x14: { // TRB ZER
+            src = Read(pc++); uint8_t m = Read(src); SET_ZERO(!(A & m)); m &= ~A; Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x15: { src = (Read(pc++) + X) & 0xFF; A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // ORA ZEX
+        case 0x16: { // ASL ZEX
+            src = (Read(pc++) + X) & 0xFF;
+            uint8_t m = Read(src); SET_CARRY(m & 0x80); m <<= 1; m &= 0xFF;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x17: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x02; Write(src, m); elapsedCycles = 5; break; } // RMB1
+        case 0x18: { SET_CARRY(0); elapsedCycles = 2; break; } // CLC
+        case 0x19: { // ORA ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x1A: { A++; SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // INC_ACC
+        case 0x1C: { // TRB ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            uint8_t m = Read(src); SET_ZERO(!(A & m)); m &= ~A; Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x1D: { // ORA ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A |= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x1E: { // ASL ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint8_t m = Read(src); SET_CARRY(m & 0x80); m <<= 1; m &= 0xFF;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x1F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x02, val, offset); elapsedCycles = 5; break; } // BBR1
+        case 0x20: { // JSR ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            pc--; StackPush((pc >> 8) & 0xFF); StackPush(pc & 0xFF); pc = src;
+            elapsedCycles = 6; break;
+        }
+        case 0x21: { // AND INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 6; break;
+        }
+        case 0x24: { // BIT ZER
+            src = Read(pc++); uint8_t m = Read(src); uint8_t res = m & A;
+            SET_NEGATIVE(res & 0x80); status = (status & 0x3F) | (uint8_t)(m & 0xC0); SET_ZERO(!res);
+            elapsedCycles = 3; break;
+        }
+        case 0x25: { src = Read(pc++); A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 3; break; } // AND ZER
+        case 0x26: { // ROL ZER
+            src = Read(pc++); uint16_t m = Read(src); m <<= 1; if(IF_CARRY()) m |= 0x01;
+            SET_CARRY(m > 0xFF); m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x27: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x04; Write(src, m); elapsedCycles = 5; break; } // RMB2
+        case 0x28: { status = StackPop(); SET_CONSTANT(1); elapsedCycles = 4; break; } // PLP
+        case 0x29: { src = pc++; A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // AND IMM
+        case 0x2A: { // ROL ACC
+            uint16_t m = A; m <<= 1; if(IF_CARRY()) m |= 0x01;
+            SET_CARRY(m > 0xFF); m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); A = m;
+            elapsedCycles = 2; break;
+        }
+        case 0x2C: { // BIT ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2; uint8_t m = Read(src); uint8_t res = m & A;
+            SET_NEGATIVE(res & 0x80); status = (status & 0x3F) | (uint8_t)(m & 0xC0); SET_ZERO(!res);
+            elapsedCycles = 4; break;
+        }
+        case 0x2D: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // AND ABS
+        case 0x2E: { // ROL ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2; uint16_t m = Read(src); m <<= 1; if(IF_CARRY()) m |= 0x01;
+            SET_CARRY(m > 0xFF); m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x2F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x04, val, offset); elapsedCycles = 5; break; } // BBR2
+        case 0x30: { // BMI
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(IF_NEGATIVE()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0x31: { // AND INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x32: { // AND ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x34: { // BIT ZEX
+            src = (Read(pc++) + X) & 0xFF; uint8_t m = Read(src); uint8_t res = m & A;
+            SET_NEGATIVE(res & 0x80); status = (status & 0x3F) | (uint8_t)(m & 0xC0); SET_ZERO(!res);
+            elapsedCycles = 4; break;
+        }
+        case 0x35: { src = (Read(pc++) + X) & 0xFF; A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // AND ZEX
+        case 0x36: { // ROL ZEX
+            src = (Read(pc++) + X) & 0xFF; uint16_t m = Read(src); m <<= 1; if(IF_CARRY()) m |= 0x01;
+            SET_CARRY(m > 0xFF); m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x37: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x08; Write(src, m); elapsedCycles = 5; break; } // RMB3
+        case 0x38: { SET_CARRY(1); elapsedCycles = 2; break; } // SEC
+        case 0x39: { // AND ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x3A: { A--; SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // DEC_ACC
+        case 0x3C: { // BIT ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            uint8_t m = Read(src); uint8_t res = m & A;
+            SET_NEGATIVE(res & 0x80); status = (status & 0x3F) | (uint8_t)(m & 0xC0); SET_ZERO(!res);
+            elapsedCycles = 4; break;
+        }
+        case 0x3D: { // AND ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A &= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x3E: { // ROL ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint16_t m = Read(src); m <<= 1; if(IF_CARRY()) m |= 0x01;
+            SET_CARRY(m > 0xFF); m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x3F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x08, val, offset); elapsedCycles = 5; break; } // BBR3
+        case 0x40: { // RTI
+            uint8_t lo, hi; status = StackPop(); lo = StackPop(); hi = StackPop(); pc = (hi << 8) | lo;
+            elapsedCycles = 6; break;
+        }
+        case 0x41: { // EOR INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 6; break;
+        }
+        case 0x45: { src = Read(pc++); A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 3; break; } // EOR ZER
+        case 0x46: { // LSR ZER
+            src = Read(pc++); uint8_t m = Read(src); SET_CARRY(m & 0x01); m >>= 1;
+            SET_NEGATIVE(0); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x47: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x10; Write(src, m); elapsedCycles = 5; break; } // RMB4
+        case 0x48: { StackPush(A); elapsedCycles = 3; break; } // PHA
+        case 0x49: { src = pc++; A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // EOR IMM
+        case 0x4A: { SET_CARRY(A & 0x01); A >>= 1; SET_NEGATIVE(0); SET_ZERO(!A); elapsedCycles = 2; break; } // LSR ACC
+        case 0x4C: { pc = Read(pc) | (Read(pc+1) << 8); elapsedCycles = 3; break; } // JMP ABS
+        case 0x4D: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // EOR ABS
+        case 0x4E: { // LSR ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2; uint8_t m = Read(src);
+            SET_CARRY(m & 0x01); m >>= 1; SET_NEGATIVE(0); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x4F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x10, val, offset); elapsedCycles = 5; break; } // BBR4
+        case 0x50: { // BVC
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(!IF_OVERFLOW()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0x51: { // EOR INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x52: { // EOR ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0x55: { src = (Read(pc++) + X) & 0xFF; A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // EOR ZEX
+        case 0x56: { // LSR ZEX
+            src = (Read(pc++) + X) & 0xFF; uint8_t m = Read(src); SET_CARRY(m & 0x01); m >>= 1;
+            SET_NEGATIVE(0); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x57: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x20; Write(src, m); elapsedCycles = 5; break; } // RMB5
+        case 0x58: { SET_INTERRUPT(0); elapsedCycles = 2; break; } // CLI
+        case 0x59: { // EOR ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x5A: { StackPush(Y); elapsedCycles = 3; break; } // PHY
+        case 0x5D: { // EOR ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A ^= Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0x5E: { // LSR ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint8_t m = Read(src); SET_CARRY(m & 0x01); m >>= 1; SET_NEGATIVE(0); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x5F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x20, val, offset); elapsedCycles = 5; break; } // BBR5
+        case 0x60: { // RTS
+            uint8_t lo, hi; lo = StackPop(); hi = StackPop(); pc = ((hi << 8) | lo) + 1;
+            elapsedCycles = 6; break;
+        }
+        case 0x61: { // ADC INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            Op_ADC(src); elapsedCycles = 6; break;
+        }
+        case 0x64: { Write(Read(pc++), 0); elapsedCycles = 3; break; } // STZ ZER
+        case 0x65: { Op_ADC(Read(pc++)); elapsedCycles = 3; break; } // ADC ZER
+        case 0x66: { // ROR ZER
+            src = Read(pc++); uint16_t m = Read(src); if(IF_CARRY()) m |= 0x100;
+            SET_CARRY(m & 0x01); m >>= 1; m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0x67: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x40; Write(src, m); elapsedCycles = 5; break; } // RMB6
+        case 0x68: { A = StackPop(); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // PLA
+        case 0x69: { Op_ADC(pc++); elapsedCycles = 2; break; } // ADC IMM
+        case 0x6A: { // ROR ACC
+            uint16_t m = A; if(IF_CARRY()) m |= 0x100;
+            SET_CARRY(m & 0x01); m >>= 1; m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); A = m;
+            elapsedCycles = 2; break;
+        }
+        case 0x6C: { // JMP ABI
+            uint16_t abs = Read(pc) | (Read(pc+1) << 8); pc += 2;
+#ifndef CMOS_INDIRECT_JMP_FIX
+            pc = Read(abs) | (Read((abs & 0xFF00) + ((abs + 1) & 0x00FF)) << 8);
+#else
+            pc = Read(abs) | (Read(abs + 1) << 8);
+#endif
+            elapsedCycles = 5; break;
+        }
+        case 0x6D: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Op_ADC(src); elapsedCycles = 4; break; } // ADC ABS
+        case 0x6E: { // ROR ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            uint16_t m = Read(src); if(IF_CARRY()) m |= 0x100;
+            SET_CARRY(m & 0x01); m >>= 1; m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x6F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x40, val, offset); elapsedCycles = 5; break; } // BBR6
+        case 0x70: { // BVS
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(IF_OVERFLOW()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0x71: { // ADC INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_ADC(src); elapsedCycles = 6; break;
+        }
+        case 0x72: { // ADC ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            Op_ADC(src); elapsedCycles = 6; break;
+        }
+        case 0x74: { Write((Read(pc++) + X) & 0xFF, 0); elapsedCycles = 4; break; } // STZ ZEX
+        case 0x75: { Op_ADC((Read(pc++) + X) & 0xFF); elapsedCycles = 4; break; } // ADC ZEX
+        case 0x76: { // ROR ZEX
+            src = (Read(pc++) + X) & 0xFF; uint16_t m = Read(src); if(IF_CARRY()) m |= 0x100;
+            SET_CARRY(m & 0x01); m >>= 1; m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x77: { src = Read(pc++); uint8_t m = Read(src); m &= ~0x80; Write(src, m); elapsedCycles = 5; break; } // RMB7
+        case 0x78: { SET_INTERRUPT(1); elapsedCycles = 2; break; } // SEI
+        case 0x79: { // ADC ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_ADC(src); elapsedCycles = 4; break;
+        }
+        case 0x7A: { Y = StackPop(); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 4; break; } // PLY
+        case 0x7C: { // JMP AIX
+            uint16_t abs = (Read(pc) | (Read(pc+1) << 8)) + X; pc += 2;
+#ifndef CMOS_INDIRECT_JMP_FIX
+            pc = Read(abs) | (Read((abs & 0xFF00) + ((abs + 1) & 0x00FF)) << 8);
+#else
+            pc = Read(abs) | (Read(abs + 1) << 8);
+#endif
+            elapsedCycles = 6; break;
+        }
+        case 0x7D: { // ADC ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_ADC(src); elapsedCycles = 4; break;
+        }
+        case 0x7E: { // ROR ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint16_t m = Read(src); if(IF_CARRY()) m |= 0x100;
+            SET_CARRY(m & 0x01); m >>= 1; m &= 0xFF; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0x7F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBRx(0x80, val, offset); elapsedCycles = 5; break; } // BBR7
+        case 0x80: { // BRA
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++;
+            pc = target; elapsedCycles = 3; break;
+        }
+        case 0x81: { // STA INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            Write(src, A); elapsedCycles = 6; break;
+        }
+        case 0x84: { Write(Read(pc++), Y); elapsedCycles = 3; break; } // STY ZER
+        case 0x85: { Write(Read(pc++), A); elapsedCycles = 3; break; } // STA ZER
+        case 0x86: { Write(Read(pc++), X); elapsedCycles = 3; break; } // STX ZER
+        case 0x87: { src = Read(pc++); uint8_t m = Read(src); m |= 0x01; Write(src, m); elapsedCycles = 5; break; } // SMB0
+        case 0x88: { Y--; SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 2; break; } // DEY
+        case 0x89: { // BIT IMM - same behavior as original Op_BIT
+            src = pc++; uint8_t m = Read(src); uint8_t res = m & A;
+            SET_NEGATIVE(res & 0x80); status = (status & 0x3F) | (uint8_t)(m & 0xC0); SET_ZERO(!res);
+            elapsedCycles = 2; break;
+        }
+        case 0x8A: { A = X; SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // TXA
+        case 0x8C: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(src, Y); elapsedCycles = 4; break; } // STY ABS
+        case 0x8D: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(src, A); elapsedCycles = 4; break; } // STA ABS
+        case 0x8E: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(src, X); elapsedCycles = 4; break; } // STX ABS
+        case 0x8F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x01, val, offset); elapsedCycles = 5; break; } // BBS0
+        case 0x90: { // BCC
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(!IF_CARRY()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0x91: { // STA INY
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8); src += Y;
+            Write(src, A); elapsedCycles = 6; break;
+        }
+        case 0x92: { // STA ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            Write(src, A); elapsedCycles = 5; break;
+        }
+        case 0x94: { Write((Read(pc++) + X) & 0xFF, Y); elapsedCycles = 4; break; } // STY ZEX
+        case 0x95: { Write((Read(pc++) + X) & 0xFF, A); elapsedCycles = 4; break; } // STA ZEX
+        case 0x96: { Write((Read(pc++) + Y) & 0xFF, X); elapsedCycles = 4; break; } // STX ZEY
+        case 0x97: { src = Read(pc++); uint8_t m = Read(src); m |= 0x02; Write(src, m); elapsedCycles = 5; break; } // SMB1
+        case 0x98: { A = Y; SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // TYA
+        case 0x99: { // STA ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(base + Y, A);
+            elapsedCycles = 5; break;
+        }
+        case 0x9A: { sp = X; elapsedCycles = 2; break; } // TXS
+        case 0x9C: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(src, 0); elapsedCycles = 4; break; } // STZ ABS
+        case 0x9D: { // STA ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(base + X, A);
+            elapsedCycles = 5; break;
+        }
+        case 0x9E: { // STZ ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; Write(base + X, 0);
+            elapsedCycles = 5; break;
+        }
+        case 0x9F: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x02, val, offset); elapsedCycles = 5; break; } // BBS1
+        case 0xA0: { Y = Read(pc++); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 2; break; } // LDY IMM
+        case 0xA1: { // LDA INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 6; break;
+        }
+        case 0xA2: { X = Read(pc++); SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 2; break; } // LDX IMM
+        case 0xA4: { Y = Read(Read(pc++)); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 3; break; } // LDY ZER
+        case 0xA5: { A = Read(Read(pc++)); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 3; break; } // LDA ZER
+        case 0xA6: { X = Read(Read(pc++)); SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 3; break; } // LDX ZER
+        case 0xA7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x04; Write(src, m); elapsedCycles = 5; break; } // SMB2
+        case 0xA8: { Y = A; SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 2; break; } // TAY
+        case 0xA9: { A = Read(pc++); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 2; break; } // LDA IMM
+        case 0xAA: { X = A; SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 2; break; } // TAX
+        case 0xAC: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Y = Read(src); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 4; break; } // LDY ABS
+        case 0xAD: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // LDA ABS
+        case 0xAE: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; X = Read(src); SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 4; break; } // LDX ABS
+        case 0xAF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x04, val, offset); elapsedCycles = 5; break; } // BBS2
+        case 0xB0: { // BCS
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(IF_CARRY()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0xB1: { // LDA INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0xB2: { // LDA ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 5; break;
+        }
+        case 0xB4: { Y = Read((Read(pc++) + X) & 0xFF); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 4; break; } // LDY ZEX
+        case 0xB5: { A = Read((Read(pc++) + X) & 0xFF); SET_NEGATIVE(A & 0x80); SET_ZERO(!A); elapsedCycles = 4; break; } // LDA ZEX
+        case 0xB6: { X = Read((Read(pc++) + Y) & 0xFF); SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 4; break; } // LDX ZEY
+        case 0xB7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x08; Write(src, m); elapsedCycles = 5; break; } // SMB3
+        case 0xB8: { SET_OVERFLOW(0); elapsedCycles = 2; break; } // CLV
+        case 0xB9: { // LDA ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0xBA: { X = sp; SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 2; break; } // TSX
+        case 0xBC: { // LDY ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Y = Read(src); SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y);
+            elapsedCycles = 4; break;
+        }
+        case 0xBD: { // LDA ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            A = Read(src); SET_NEGATIVE(A & 0x80); SET_ZERO(!A);
+            elapsedCycles = 4; break;
+        }
+        case 0xBE: { // LDX ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            X = Read(src); SET_NEGATIVE(X & 0x80); SET_ZERO(!X);
+            elapsedCycles = 4; break;
+        }
+        case 0xBF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x08, val, offset); elapsedCycles = 5; break; } // BBS3
+        case 0xC0: { unsigned int tmp = Y - Read(pc++); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 2; break; } // CPY IMM
+        case 0xC1: { // CMP INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF));
+            elapsedCycles = 6; break;
+        }
+        case 0xC4: { unsigned int tmp = Y - Read(Read(pc++)); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 3; break; } // CPY ZER
+        case 0xC5: { unsigned int tmp = A - Read(Read(pc++)); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 3; break; } // CMP ZER
+        case 0xC6: { // DEC ZER
+            src = Read(pc++); uint8_t m = Read(src); m = (m - 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0xC7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x10; Write(src, m); elapsedCycles = 5; break; } // SMB4
+        case 0xC8: { Y = (Y + 1) % 256; SET_NEGATIVE(Y & 0x80); SET_ZERO(!Y); elapsedCycles = 2; break; } // INY
+        case 0xC9: { unsigned int tmp = A - Read(pc++); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 2; break; } // CMP IMM
+        case 0xCA: { X = (X - 1) % 256; SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 2; break; } // DEX
+        case 0xCB: { waiting = true; elapsedCycles = 3; break; } // WAI
+        case 0xCC: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; unsigned int tmp = Y - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 4; break; } // CPY ABS
+        case 0xCD: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 4; break; } // CMP ABS
+        case 0xCE: { // DEC ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2; uint8_t m = Read(src); m = (m - 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0xCF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x10, val, offset); elapsedCycles = 5; break; } // BBS4
+        case 0xD0: { // BNE
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(!IF_ZERO()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0xD1: { // CMP INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF));
+            elapsedCycles = 3; break;
+        }
+        case 0xD2: { // CMP ZPI
+            uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF));
+            elapsedCycles = 5; break;
+        }
+        case 0xD5: { unsigned int tmp = A - Read((Read(pc++) + X) & 0xFF); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 4; break; } // CMP ZEX
+        case 0xD6: { // DEC ZEX
+            src = (Read(pc++) + X) & 0xFF; uint8_t m = Read(src); m = (m - 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0xD7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x20; Write(src, m); elapsedCycles = 5; break; } // SMB5
+        case 0xD8: { SET_DECIMAL(0); elapsedCycles = 2; break; } // CLD
+        case 0xD9: { // CMP ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF));
+            elapsedCycles = 4; break;
+        }
+        case 0xDA: { StackPush(X); elapsedCycles = 3; break; } // PHX
+        case 0xDB: { illegalOpcode = true; Stopped(); elapsedCycles = 3; break; } // STP
+        case 0xDD: { // CMP ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            unsigned int tmp = A - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF));
+            elapsedCycles = 4; break;
+        }
+        case 0xDE: { // DEC ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint8_t m = Read(src); m = (m - 1) % 256; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 7; break;
+        }
+        case 0xDF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x20, val, offset); elapsedCycles = 5; break; } // BBS5
+        case 0xE0: { unsigned int tmp = X - Read(pc++); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 2; break; } // CPX IMM
+        case 0xE1: { // SBC INX
+            uint8_t zp = (Read(pc++) + X) & 0xFF; src = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            Op_SBC(src); elapsedCycles = 6; break;
+        }
+        case 0xE4: { unsigned int tmp = X - Read(Read(pc++)); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 3; break; } // CPX ZER
+        case 0xE5: { Op_SBC(Read(pc++)); elapsedCycles = 3; break; } // SBC ZER
+        case 0xE6: { // INC ZER
+            src = Read(pc++); uint8_t m = Read(src); m = (m + 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 5; break;
+        }
+        case 0xE7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x40; Write(src, m); elapsedCycles = 5; break; } // SMB6
+        case 0xE8: { X = (X + 1) % 256; SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 2; break; } // INX
+        case 0xE9: { Op_SBC(pc++); elapsedCycles = 2; break; } // SBC IMM
+        case 0xEA: { elapsedCycles = 2; break; } // NOP
+        case 0xEC: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; unsigned int tmp = X - Read(src); SET_CARRY(tmp < 0x100); SET_NEGATIVE(tmp & 0x80); SET_ZERO(!(tmp & 0xFF)); elapsedCycles = 4; break; } // CPX ABS
+        case 0xED: { src = Read(pc) | (Read(pc+1) << 8); pc += 2; Op_SBC(src); elapsedCycles = 4; break; } // SBC ABS
+        case 0xEE: { // INC ABS
+            src = Read(pc) | (Read(pc+1) << 8); pc += 2; uint8_t m = Read(src); m = (m + 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0xEF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x40, val, offset); elapsedCycles = 5; break; } // BBS6
+        case 0xF0: { // BEQ
+            uint16_t off = Read(pc++); if(off & 0x80) off |= 0xFF00; uint16_t target = pc + (int16_t)off;
+            if(IF_ZERO()) { if((pc & 0xFF00) != (target & 0xFF00)) opExtraCycles++; pc = target; opExtraCycles++; }
+            elapsedCycles = 2; break;
+        }
+        case 0xF1: { // SBC INY
+            uint8_t zp = Read(pc++); uint16_t base = Read(zp) | (Read((zp+1) & 0xFF) << 8);
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_SBC(src); elapsedCycles = 5; break;
+        }
+        case 0xF2: { uint8_t zp = Read(pc++); src = Read(zp) | (Read((zp+1) & 0xFF) << 8); Op_SBC(src); elapsedCycles = 5; break; } // SBC ZPI
+        case 0xF5: { Op_SBC((Read(pc++) + X) & 0xFF); elapsedCycles = 4; break; } // SBC ZEX
+        case 0xF6: { // INC ZEX
+            src = (Read(pc++) + X) & 0xFF; uint8_t m = Read(src); m = (m + 1) % 256;
+            SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 6; break;
+        }
+        case 0xF7: { src = Read(pc++); uint8_t m = Read(src); m |= 0x80; Write(src, m); elapsedCycles = 5; break; } // SMB7
+        case 0xF8: { SET_DECIMAL(1); elapsedCycles = 2; break; } // SED
+        case 0xF9: { // SBC ABY
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + Y; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_SBC(src); elapsedCycles = 4; break;
+        }
+        case 0xFA: { X = StackPop(); SET_NEGATIVE(X & 0x80); SET_ZERO(!X); elapsedCycles = 4; break; } // PLX
+        case 0xFD: { // SBC ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2;
+            src = base + X; if((src & 0xFF00) != (base & 0xFF00)) opExtraCycles++;
+            Op_SBC(src); elapsedCycles = 4; break;
+        }
+        case 0xFE: { // INC ABX
+            uint16_t base = Read(pc) | (Read(pc+1) << 8); pc += 2; src = base + X;
+            uint8_t m = Read(src); m = (m + 1) % 256; SET_NEGATIVE(m & 0x80); SET_ZERO(!m); Write(src, m);
+            elapsedCycles = 7; break;
+        }
+        case 0xFF: { auto val = Read(Read(pc++)); uint16_t offset = Read(pc++); Op_BBSx(0x80, val, offset); elapsedCycles = 5; break; } // BBS7
+        default: { illegalOpcode = true; illegalOpcodeSrc = opcode; break; }
+        } // end switch
+
+        elapsedCycles += opExtraCycles;
+        opExtraCycles = 0;
+
+        cycleCount += elapsedCycles;
+        cyclesRemaining -= elapsedCycles;
+        if(irq_timer > 0) {
+            if(irq_timer < elapsedCycles) {
+                irq_timer = 0;
+            } else {
+                irq_timer -= elapsedCycles;
+            }
+            if(irq_timer == 0) {
+                if((irq_gate == NULL) || (*irq_gate)) {
+                    IRQ();
+                    irq_line = true;
+                }
+            }
+        }
+    }
+}
