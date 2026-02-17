@@ -9,9 +9,12 @@ enum NdsAcpPxiConstants {
 };
 
 enum NdsAcpPxiCommand {
-    NDS_ACP_CMD_RAM_WRITE = 0, // arg: 12-bit ACP RAM address, value: byte
+    NDS_ACP_CMD_RAM_WRITE = 0, // legacy: arg: 12-bit ACP RAM address, value: byte
     NDS_ACP_CMD_REG_WRITE = 1, // arg: ACP register index (address & 7), value: byte
     NDS_ACP_CMD_CONTROL   = 2, // arg: control opcode, value: byte
+    NDS_ACP_CMD_SET_RAM_PTR_LO = 3, // arg/value compose low 20 bits of ARM9 RAM pointer
+    NDS_ACP_CMD_SET_RAM_PTR_HI = 4, // arg composes upper 12 bits of ARM9 RAM pointer
+    NDS_ACP_CMD_RAM_SYNC = 5, // arg/value: generation counter (optional)
 };
 
 enum NdsAcpControlOpcode {
@@ -36,4 +39,3 @@ static inline uint32_t ndsAcpMsgArg(uint32_t msg) {
 static inline uint32_t ndsAcpMsgValue(uint32_t msg) {
     return msg & 0xFF;
 }
-

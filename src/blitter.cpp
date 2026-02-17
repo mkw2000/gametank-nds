@@ -1,6 +1,16 @@
 #include "blitter.h"
 #ifdef NDS_BUILD
 #include "nds_platform.h"
+
+extern "C" {
+void nds_blit_copy_opaque_arm(const uint8_t* src, uint8_t* dst8, uint16_t* dst15, uint32_t count);
+void nds_blit_copy_transparent_arm(const uint8_t* src, uint8_t* dst8, uint16_t* dst15, uint32_t count);
+extern const uint16_t* g_nds_blit_palette;
+}
+
+extern "C" {
+const uint16_t* g_nds_blit_palette = gt_palette_rgb555;
+}
 #endif
 #ifndef ITCM_CODE
 #define ITCM_CODE
@@ -137,6 +147,8 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
     const int vOffset = yShift << 7;
 
 #ifdef NDS_BUILD
+    g_nds_blit_palette = &gt_palette_rgb555[palette_select];
+
     // NDS Fast Path: Linear copy (GCARRY set, xDir positive)
     // Most sprites and backgrounds use this mode.
     // We can avoid the expensive coordinate recalculation per pixel.
@@ -158,15 +170,12 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
             uint8_t* dstPtr = &system_state->vram[vramIndex];
             uint16_t* dst15Ptr = &vram_surface[vramIndex];
 
-            // Run the batch
-            for (uint64_t i = 0; i < toProcess; i++) {
-                uint8_t colorbus = *srcPtr++;
-                if (!transparency || colorbus != 0) {
-                    *dstPtr = colorbus;
-                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
-                }
-                dstPtr++;
-                dst15Ptr++;
+            // Run the batch using ARM assembly loops.
+            const uint32_t count = (uint32_t)toProcess;
+            if (transparency) {
+                nds_blit_copy_transparent_arm(srcPtr, dstPtr, dst15Ptr, count);
+            } else {
+                nds_blit_copy_opaque_arm(srcPtr, dstPtr, dst15Ptr, count);
             }
 
             // Update counters
@@ -271,18 +280,11 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
             // Only if transparency is off.
             // But usually transparency is ON.
             
-            for(uint64_t i = 0; i < toProcess; i++) {
-                // Read
-                uint8_t colorbus = *srcPtr; // Linear increment implies we just use ++
-                srcPtr++; // GX increments by 1
-                
-                // Write
-                if (!transparency || colorbus != 0) {
-                    *dstPtr = colorbus;
-                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
-                }
-                dstPtr++; // VX increments by 1
-                dst15Ptr++;
+            const uint32_t count = (uint32_t)toProcess;
+            if (transparency) {
+                nds_blit_copy_transparent_arm(srcPtr, dstPtr, dst15Ptr, count);
+            } else {
+                nds_blit_copy_opaque_arm(srcPtr, dstPtr, dst15Ptr, count);
             }
             
             // Update counters manually as if we ran the state machine

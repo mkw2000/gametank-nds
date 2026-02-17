@@ -42,6 +42,22 @@ using namespace std;
 class mos6502
 {
 private:
+	
+
+	typedef void (mos6502::*CodeExec)(uint16_t);
+	typedef uint16_t (mos6502::*AddrExec)();
+
+	struct Instr
+	{
+		AddrExec addr;
+		CodeExec code;
+		uint8_t cycles;
+	};
+
+	Instr InstrTable[256];
+
+	void Exec(Instr i);
+
 	// Helper function for determining if two addresses are in the same page
 	inline bool addressesSamePage(uint16_t a, uint16_t b);
 
@@ -203,6 +219,13 @@ private:
 	CPUEvent Stopped;
 	BusRead Sync;
 
+	uint64_t* run_cycle_target = nullptr;
+	uint32_t run_pending_cycles = 0;
+
+	inline uint8_t ReadBus(uint16_t address);
+	inline void WriteBus(uint16_t address, uint8_t value);
+	inline void FlushRunCycles();
+
 	// stack operations
 	inline void StackPush(uint8_t byte);
 	inline uint8_t StackPop();
@@ -223,6 +246,10 @@ public:
 	bool illegalOpcode = false;
 	bool waiting;
 	uint16_t illegalOpcodeSrc;
+#if defined(NDS_BUILD) && defined(ARM9)
+	uint32_t opcode_exec_count[256];
+	uint64_t opcode_cycle_count[256];
+#endif
 
 	// registers
 	uint8_t A; // accumulator
@@ -255,5 +282,9 @@ public:
 	void RunOptimized(
 		int32_t cycles,
 		uint64_t& cycleCount);
+#if defined(NDS_BUILD) && defined(ARM9)
+	void GetOpcodeProfileSnapshot(uint32_t outExec[256], uint64_t outCycles[256]) const;
+	void ResetOpcodeProfile();
+#endif
 	void Freeze();
 };

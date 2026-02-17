@@ -46,6 +46,8 @@ typedef struct ACPState {
 	uint16_t nds_ipc_head;
 	uint16_t nds_ipc_tail;
 	uint32_t nds_ipc_dropped;
+	bool nds_ram_dirty;
+	uint16_t nds_ram_sync_gen;
 	bool nds_remote_ready;
 	int nds_last_sent_volume;
 	bool nds_last_sent_muted;

@@ -1146,6 +1146,123 @@ static bool ndsMenuOpen = false;
 static int ndsFrameSkip = 1;    // render every Nth frame (1=no skip, 2=skip 1, etc)
 static int ndsFrameCounter = 0;
 
+struct NDSPerfStats {
+	uint64_t frames = 0;
+	uint64_t totalTicks = 0;
+	uint64_t cpuTicks = 0;
+	uint64_t blitTicks = 0;
+	uint64_t audioTicks = 0;
+	uint64_t renderTicks = 0;
+	uint64_t inputTicks = 0;
+	uint64_t lastFrames = 0;
+	uint64_t lastTotalTicks = 0;
+	uint64_t lastCpuTicks = 0;
+	uint64_t lastBlitTicks = 0;
+	uint64_t lastAudioTicks = 0;
+	uint64_t lastRenderTicks = 0;
+	uint64_t lastInputTicks = 0;
+	bool enabled = true;
+};
+
+static NDSPerfStats ndsPerf;
+static uint32_t ndsLastOpcodeExec[256] = {0};
+static uint64_t ndsLastOpcodeCycles[256] = {0};
+
+static void NDSPerfMaybePrint() {
+	if (!ndsPerf.enabled || ndsMenuOpen) {
+		return;
+	}
+	const uint64_t frameDelta = ndsPerf.frames - ndsPerf.lastFrames;
+	if (frameDelta < 60) {
+		return;
+	}
+
+	const uint64_t totalDelta = ndsPerf.totalTicks - ndsPerf.lastTotalTicks;
+	const uint64_t cpuDelta = ndsPerf.cpuTicks - ndsPerf.lastCpuTicks;
+	const uint64_t blitDelta = ndsPerf.blitTicks - ndsPerf.lastBlitTicks;
+	const uint64_t audioDelta = ndsPerf.audioTicks - ndsPerf.lastAudioTicks;
+	const uint64_t renderDelta = ndsPerf.renderTicks - ndsPerf.lastRenderTicks;
+	const uint64_t inputDelta = ndsPerf.inputTicks - ndsPerf.lastInputTicks;
+
+	ndsPerf.lastFrames = ndsPerf.frames;
+	ndsPerf.lastTotalTicks = ndsPerf.totalTicks;
+	ndsPerf.lastCpuTicks = ndsPerf.cpuTicks;
+	ndsPerf.lastBlitTicks = ndsPerf.blitTicks;
+	ndsPerf.lastAudioTicks = ndsPerf.audioTicks;
+	ndsPerf.lastRenderTicks = ndsPerf.renderTicks;
+	ndsPerf.lastInputTicks = ndsPerf.inputTicks;
+
+	if (totalDelta == 0) {
+		return;
+	}
+
+	const uint32_t avgTicks = (uint32_t)(totalDelta / frameDelta);
+	const uint32_t avgUs = timerTicks2usec(avgTicks);
+	const uint32_t cpuPct = (uint32_t)((cpuDelta * 100ULL) / totalDelta);
+	const uint32_t blitPct = (uint32_t)((blitDelta * 100ULL) / totalDelta);
+	const uint32_t audioPct = (uint32_t)((audioDelta * 100ULL) / totalDelta);
+	const uint32_t renderPct = (uint32_t)((renderDelta * 100ULL) / totalDelta);
+	const uint32_t inputPct = (uint32_t)((inputDelta * 100ULL) / totalDelta);
+	const uint32_t budgetTicks = BUS_CLOCK / 60;
+	const uint32_t speedPct = avgTicks ? (uint32_t)((100ULL * budgetTicks) / avgTicks) : 0;
+	uint8_t topOps[3] = {0, 0, 0};
+	uint64_t topOpCycles[3] = {0, 0, 0};
+	uint32_t topOpExec[3] = {0, 0, 0};
+
+	if (cpu_core) {
+		uint32_t execNow[256];
+		uint64_t cyclesNow[256];
+		cpu_core->GetOpcodeProfileSnapshot(execNow, cyclesNow);
+		for (int i = 0; i < 256; ++i) {
+			const uint64_t deltaCycles = cyclesNow[i] - ndsLastOpcodeCycles[i];
+			const uint32_t deltaExec = execNow[i] - ndsLastOpcodeExec[i];
+			ndsLastOpcodeCycles[i] = cyclesNow[i];
+			ndsLastOpcodeExec[i] = execNow[i];
+			if (deltaCycles == 0) continue;
+
+			if (deltaCycles > topOpCycles[0]) {
+				topOpCycles[2] = topOpCycles[1]; topOps[2] = topOps[1]; topOpExec[2] = topOpExec[1];
+				topOpCycles[1] = topOpCycles[0]; topOps[1] = topOps[0]; topOpExec[1] = topOpExec[0];
+				topOpCycles[0] = deltaCycles; topOps[0] = (uint8_t)i; topOpExec[0] = deltaExec;
+			} else if (deltaCycles > topOpCycles[1]) {
+				topOpCycles[2] = topOpCycles[1]; topOps[2] = topOps[1]; topOpExec[2] = topOpExec[1];
+				topOpCycles[1] = deltaCycles; topOps[1] = (uint8_t)i; topOpExec[1] = deltaExec;
+			} else if (deltaCycles > topOpCycles[2]) {
+				topOpCycles[2] = deltaCycles; topOps[2] = (uint8_t)i; topOpExec[2] = deltaExec;
+			}
+		}
+	}
+
+	// Keep output on a dedicated block of lines on the sub-screen console.
+	printf("\x1b[18;0H");
+	printf("Perf: %6lu us  %3lu%% realtime    \n",
+		(unsigned long)avgUs,
+		(unsigned long)speedPct);
+	printf("CPU  %3lu%%  BLIT %3lu%%  REN %3lu%% \n",
+		(unsigned long)cpuPct,
+		(unsigned long)blitPct,
+		(unsigned long)renderPct);
+	printf("AUD  %3lu%%  IN   %3lu%%            \n",
+		(unsigned long)audioPct,
+		(unsigned long)inputPct);
+	if (cpuDelta > 0 && topOpCycles[0] > 0) {
+		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / cpuDelta);
+		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / cpuDelta);
+		const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / cpuDelta);
+		printf("OP1 %02X %2lu%% OP2 %02X %2lu%%     \n",
+			(unsigned int)topOps[0], (unsigned long)p0,
+			(unsigned int)topOps[1], (unsigned long)p1);
+		printf("OP3 %02X %2lu%% E:%5lu/%5lu/%5lu \n",
+			(unsigned int)topOps[2], (unsigned long)p2,
+			(unsigned long)topOpExec[0],
+			(unsigned long)topOpExec[1],
+			(unsigned long)topOpExec[2]);
+	} else {
+		printf("OP1 -- -- OP2 -- --              \n");
+		printf("OP3 -- -- E:    0/    0/    0    \n");
+	}
+}
+
 #define NDS_FILE_LINES 20  // visible file entries on screen
 
 static void ndsMenuScanDir() {
@@ -1646,6 +1763,14 @@ EM_BOOL mainloop(double time, void* userdata) {
         }
         frame_time_accumulator -= target_frame_period_ms;
 #endif
+#ifdef NDS_BUILD
+	cpuStartTiming(0);
+	uint32_t ndsCpuTicks = 0;
+	uint32_t ndsBlitTicks = 0;
+	uint32_t ndsAudioTicks = 0;
+	uint32_t ndsRenderTicks = 0;
+	uint32_t ndsInputTicks = 0;
+#endif
 
 #ifdef WRAPPER_MODE
 	if(!paused && !showMenu) {
@@ -1674,7 +1799,13 @@ EM_BOOL mainloop(double time, void* userdata) {
 			}
 #else
 			intended_cycles = timekeeper.cycles_per_vsync;
+#ifdef NDS_BUILD
+			uint32_t t0 = cpuGetTiming();
+#endif
 			cpu_core->RunOptimized(intended_cycles, timekeeper.totalCyclesCount);
+#ifdef NDS_BUILD
+			ndsCpuTicks += cpuGetTiming() - t0;
+#endif
 #endif
 			timekeeper.actual_cycles = timekeeper.totalCyclesCount - timekeeper.actual_cycles;
 			if(cpu_core->illegalOpcode) {
@@ -1791,12 +1922,20 @@ EM_BOOL mainloop(double time, void* userdata) {
 				SDL_Delay(16);
 #endif
 		}
+#ifdef NDS_BUILD
+		uint32_t tBlit = cpuGetTiming();
+#endif
 		blitter->CatchUp();
+#ifdef NDS_BUILD
+		ndsBlitTicks += cpuGetTiming() - tBlit;
+#endif
 		
 
 #ifdef NDS_BUILD
 		// ARM9 side only forwards ACP commands; synthesis runs on ARM7.
+		uint32_t tAudio = cpuGetTiming();
 		soundcard->TickNDSAudio();
+		ndsAudioTicks += cpuGetTiming() - tAudio;
 #else
 		if(EmulatorConfig::noSound) {
 			AudioCoprocessor::fill_audio(AudioCoprocessor::singleton_acp_state, NULL, AudioCoprocessor::singleton_acp_state->samples_per_frame);
@@ -1804,6 +1943,7 @@ EM_BOOL mainloop(double time, void* userdata) {
 #endif
 
 #ifdef NDS_BUILD
+		uint32_t tInput = cpuGetTiming();
 		// NDS: menu toggle with L or R
 		scanKeys();
 		uint16_t ndsDown = keysDown();
@@ -1824,6 +1964,7 @@ EM_BOOL mainloop(double time, void* userdata) {
 				resetQueued = 2;
 			}
 		}
+		ndsInputTicks += cpuGetTiming() - tInput;
 #else
 		while( SDL_PollEvent( &e ) != 0 )
         {
@@ -1928,7 +2069,9 @@ EM_BOOL mainloop(double time, void* userdata) {
 #ifdef NDS_BUILD
 		// Only render on the last frame of a frame-skip batch
 		if (ndsFrameCounter == ndsFrameSkip - 1) {
+			uint32_t tRender = cpuGetTiming();
 			refreshScreen();
+			ndsRenderTicks += cpuGetTiming() - tRender;
 		}
 #else
 		refreshScreen();
@@ -1945,6 +2088,18 @@ EM_BOOL mainloop(double time, void* userdata) {
 			delete w;
 		});
 		toolWindows.erase(to_be_removed, end(toolWindows));
+#endif
+
+#ifdef NDS_BUILD
+		uint32_t ndsFrameTicks = cpuEndTiming();
+		ndsPerf.frames++;
+		ndsPerf.totalTicks += ndsFrameTicks;
+		ndsPerf.cpuTicks += ndsCpuTicks;
+		ndsPerf.blitTicks += ndsBlitTicks;
+		ndsPerf.audioTicks += ndsAudioTicks;
+		ndsPerf.renderTicks += ndsRenderTicks;
+		ndsPerf.inputTicks += ndsInputTicks;
+		NDSPerfMaybePrint();
 #endif
 		
 	if(!running) {

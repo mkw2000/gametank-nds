@@ -41,6 +41,10 @@ CPPFILES_EXPLICIT := \
 	timekeeper.cpp \
 	mos6502.cpp
 
+SFILES_EXPLICIT := \
+	nds_blit_arm.s \
+	mos6502_hot_arm.s
+
 #---------------------------------------------------------------------------------
 # Options for code generation
 #---------------------------------------------------------------------------------
@@ -80,7 +84,7 @@ export VPATH  := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
 
 # Explicitly listed source files
-export OFILES := $(CPPFILES_EXPLICIT:.cpp=.o)
+export OFILES := $(CPPFILES_EXPLICIT:.cpp=.o) $(SFILES_EXPLICIT:.s=.o)
 
 export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 	$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -107,6 +111,11 @@ DEPENDS := $(OFILES:.o=.d)
 
 $(OUTPUT).nds: $(OUTPUT).elf $(ARM7_ELF)
 $(OUTPUT).elf: $(OFILES)
+
+# Keep core emulation/render hot files in ARM mode for throughput.
+blitter.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+mos6502.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+gte.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 
 -include $(DEPENDS)
 

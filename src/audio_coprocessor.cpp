@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <fstream>
 #include <cstring>
+#include <cstdint>
 
 #include "audio_coprocessor.h"
 #include "emulator_config.h"
@@ -36,12 +37,24 @@ static inline void ACP_QueuePush(ACPState* state, uint32_t msg) {
     state->nds_ipc_queue[state->nds_ipc_head] = msg;
     state->nds_ipc_head = nextHead;
 }
+
+static inline void ACP_QueueRamSync(ACPState* state) {
+    if (!state->nds_remote_ready || !state->nds_ram_dirty) {
+        return;
+    }
+
+    DC_FlushRange(state->ram, AUDIO_RAM_SIZE);
+    state->nds_ram_sync_gen++;
+    const uint16_t gen = state->nds_ram_sync_gen;
+    ACP_QueuePush(state, ndsAcpPackMsg(NDS_ACP_CMD_RAM_SYNC, (gen >> 8) & 0xFF, gen & 0xFF));
+    state->nds_ram_dirty = false;
+}
 #endif
 
 void AudioCoprocessor::ram_write(uint16_t address, uint8_t value) {
 	state.ram[address & 0xFFF] = value;
 #ifdef NDS_BUILD
-    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_RAM_WRITE, address & 0x0FFF, value));
+    state.nds_ram_dirty = true;
 #endif
 }
 
@@ -87,6 +100,7 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 			break;
 	}
 #ifdef NDS_BUILD
+    ACP_QueueRamSync(&state);
     ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_REG_WRITE, address & 7, value));
 #endif
 }
@@ -166,6 +180,8 @@ void AudioCoprocessor::TickNDSAudio() {
         return;
     }
 
+    ACP_QueueRamSync(&state);
+
     // Forward runtime controls (volume/mute/pause) to ARM7 when changed.
     if (state.nds_last_sent_volume != state.volume) {
         state.nds_last_sent_volume = state.volume;
@@ -239,6 +255,8 @@ void AudioCoprocessor::StartAudio() {
     state.nds_ipc_head = 0;
     state.nds_ipc_tail = 0;
     state.nds_ipc_dropped = 0;
+    state.nds_ram_dirty = true;
+    state.nds_ram_sync_gen = 0;
     state.nds_remote_ready = false;
     state.nds_last_sent_volume = -1;
     state.nds_last_sent_muted = !state.isMuted;
@@ -247,6 +265,14 @@ void AudioCoprocessor::StartAudio() {
     // Wait until ARM7 side has installed a handler/mailbox for this channel.
     pxiWaitRemote((PxiChannel)NDS_ACP_PXI_CHANNEL);
     state.nds_remote_ready = true;
+
+    // Send ARM9 ACP RAM pointer to ARM7: split 32-bit pointer into low20/high12.
+    uintptr_t ram_ptr = (uintptr_t)state.ram;
+    uint32_t lo20 = (uint32_t)(ram_ptr & 0xFFFFF);
+    uint32_t hi12 = (uint32_t)((ram_ptr >> 20) & 0xFFF);
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_SET_RAM_PTR_LO, lo20 & 0xFFF, (lo20 >> 12) & 0xFF));
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_SET_RAM_PTR_HI, hi12, 0));
+    ACP_QueueRamSync(&state);
 
     // Force initial synchronization of basic controls.
     ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_VOLUME, ACP_ClampVolumeU8(state.volume)));
@@ -319,6 +345,8 @@ AudioCoprocessor::AudioCoprocessor() {
     state.nds_ipc_head = 0;
     state.nds_ipc_tail = 0;
     state.nds_ipc_dropped = 0;
+    state.nds_ram_dirty = false;
+    state.nds_ram_sync_gen = 0;
     state.nds_remote_ready = false;
     state.nds_last_sent_volume = -1;
     state.nds_last_sent_muted = false;

@@ -23,9 +23,10 @@ struct A7AcpState {
     uint32_t cycles_per_sample;
     uint8_t clkMult;
     uint64_t cycle_counter;
-    uint32_t pending_cycles;
-    uint8_t audio_cycle_divider;
-    uint8_t audio_cycle_accum;
+    uint32_t shared_ram_ptr;
+    uint32_t shared_ram_lo20;
+    uint16_t shared_ram_sync_gen;
+    bool has_shared_ram_ptr;
     int volume;
     bool isMuted;
     bool isPaused;
@@ -94,6 +95,14 @@ static void HandleControlWrite(uint16_t opcode, uint8_t value) {
     }
 }
 
+static void SyncRamFromArm9() {
+    if (!s_acp.has_shared_ram_ptr || s_acp.shared_ram_ptr == 0) {
+        return;
+    }
+    const uint8_t* src = reinterpret_cast<const uint8_t*>(s_acp.shared_ram_ptr);
+    memcpy(s_acp.ram, src, ACP_RAM_SIZE);
+}
+
 static void HandlePxiMessage(uint32_t msg) {
     uint32_t cmd = ndsAcpMsgCmd(msg);
     uint32_t arg = ndsAcpMsgArg(msg);
@@ -102,6 +111,17 @@ static void HandlePxiMessage(uint32_t msg) {
     switch (cmd) {
         case NDS_ACP_CMD_RAM_WRITE:
             s_acp.ram[arg & 0x0FFF] = value;
+            break;
+        case NDS_ACP_CMD_SET_RAM_PTR_LO:
+            s_acp.shared_ram_lo20 = (arg & 0x0FFF) | ((uint32_t)value << 12);
+            break;
+        case NDS_ACP_CMD_SET_RAM_PTR_HI:
+            s_acp.shared_ram_ptr = s_acp.shared_ram_lo20 | ((arg & 0x0FFF) << 20);
+            s_acp.has_shared_ram_ptr = true;
+            break;
+        case NDS_ACP_CMD_RAM_SYNC:
+            s_acp.shared_ram_sync_gen = (uint16_t)(((arg & 0xFF) << 8) | value);
+            SyncRamFromArm9();
             break;
         case NDS_ACP_CMD_REG_WRITE:
             HandleAcpRegisterWrite((uint8_t)arg, value);
@@ -143,20 +163,9 @@ static void FillAudioChunk(int16_t* out, int sampleCount) {
             if (s_acp.running && s_acp.cpu) {
                 s_acp.cpu->IRQ();
                 s_acp.cpu->ClearIRQ();
-                s_acp.pending_cycles += s_acp.cycles_per_sample;
-                s_acp.audio_cycle_accum++;
-                if (s_acp.audio_cycle_accum >= s_acp.audio_cycle_divider) {
-                    s_acp.audio_cycle_accum = 0;
-                    s_acp.cpu->RunOptimized((int32_t)s_acp.pending_cycles, s_acp.cycle_counter);
-                    s_acp.pending_cycles = 0;
-                }
+                s_acp.cpu->RunOptimized((int32_t)s_acp.cycles_per_sample, s_acp.cycle_counter);
             }
         }
-    }
-
-    if (s_acp.running && s_acp.cpu && s_acp.pending_cycles) {
-        s_acp.cpu->RunOptimized((int32_t)s_acp.pending_cycles, s_acp.cycle_counter);
-        s_acp.pending_cycles = 0;
     }
 }
 
@@ -210,14 +219,15 @@ extern "C" void gtAudioOffloadInit(void) {
     s_acp.dacReg = 0;
     s_acp.clkMult = 4;
     s_acp.cycles_per_sample = 1024;
-    s_acp.pending_cycles = 0;
-    s_acp.audio_cycle_divider = 8;
-    s_acp.audio_cycle_accum = 0;
-    s_acp.clksPerHostSample = 315000000 / (88 * 11025);
+    s_acp.shared_ram_ptr = 0;
+    s_acp.shared_ram_lo20 = 0;
+    s_acp.shared_ram_sync_gen = 0;
+    s_acp.has_shared_ram_ptr = false;
     s_acp.volume = 255;
     s_acp.isMuted = false;
     s_acp.isPaused = false;
-    s_acp.output_hz = 11025;
+    s_acp.output_hz = 8000;
+    s_acp.clksPerHostSample = 315000000 / (88 * s_acp.output_hz);
     s_acp.chunk_samples = 256;
     s_acp.buffer_index = 0;
 
