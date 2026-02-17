@@ -1375,13 +1375,9 @@ void refreshScreen() {
 	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2;
 
 	for (int y = 0; y < GT_HEIGHT; y++) {
-		int srcRow = (srcY + y) * vRAM_Surface->w;
-		int dstRow = (yOff + y) * NDS_SCREEN_WIDTH + xOff;
-		for (int x = 0; x < GT_WIDTH; x += 2) {
-			uint32_t pixel1 = srcPixels[srcRow + x];
-			uint32_t pixel2 = srcPixels[srcRow + x + 1];
-			dsVram[dstRow + x] = argb_to_rgb15(pixel1);
-			dsVram[dstRow + x + 1] = argb_to_rgb15(pixel2);
+		for (int x = 0; x < GT_WIDTH; x++) {
+			uint32_t pixel = srcPixels[(srcY + y) * vRAM_Surface->w + x];
+			dsVram[(yOff + y) * NDS_SCREEN_WIDTH + (xOff + x)] = argb_to_rgb15(pixel);
 		}
 	}
 #else
