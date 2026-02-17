@@ -46,7 +46,7 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 	}
 }
 
-void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
+void ITCM_CODE AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
     ACPState *state = (ACPState*) udata;
     uint16_t *stream16 = (uint16_t*) stream;
 

@@ -469,7 +469,7 @@ uint8_t MemorySync(uint16_t address) {
 	return MemoryRead(address);
 }
 
-void MemoryWrite(uint16_t address, uint8_t value) {
+void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 	if(address & 0x8000) {
 		if(loadedRomType == RomType::FLASH2M_RAM32K) {
 			if(!(address & 0x4000)) {
@@ -1733,9 +1733,9 @@ EM_BOOL mainloop(double time, void* userdata) {
 		// NDS: menu toggle with L or R
 		scanKeys();
 		uint16_t ndsDown = keysDown();
-		if (!ndsMenuOpen && (ndsDown & (KEY_L | KEY_R))) {
+		/*if (!ndsMenuOpen && (ndsDown & (KEY_L | KEY_R))) {
 			ndsMenuOpen_();
-		}
+		}*/
 
 		if (ndsMenuOpen) {
 			ndsMenuHandleInput();

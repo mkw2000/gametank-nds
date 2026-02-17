@@ -1128,6 +1128,8 @@ ITCM_CODE uint16_t mos6502::Addr_ABX()
 	return addr;
 }
 
+
+
 ITCM_CODE uint16_t mos6502::Addr_ABY()
 {
 	uint16_t addr;
@@ -1584,13 +1586,13 @@ void mos6502::Op_CLD(uint16_t src)
 	return;
 }
 
-ITCM_CODE void mos6502::Op_CLI(uint16_t src)
+void mos6502::Op_CLI(uint16_t src)
 {
 	SET_INTERRUPT(0);
 	return;
 }
 
-ITCM_CODE void mos6502::Op_CLV(uint16_t src)
+void mos6502::Op_CLV(uint16_t src)
 {
 	SET_OVERFLOW(0);
 	return;
@@ -2152,7 +2154,7 @@ ITCM_CODE void mos6502::Op_BBSx(uint8_t mask, uint8_t val, uint16_t offset)
 	}
 }
 
-ITCM_CODE void mos6502::Op_BBS0(uint16_t src)
+void mos6502::Op_BBS0(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2160,7 +2162,7 @@ ITCM_CODE void mos6502::Op_BBS0(uint16_t src)
 	Op_BBSx(0x01, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS1(uint16_t src)
+void mos6502::Op_BBS1(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2168,7 +2170,7 @@ ITCM_CODE void mos6502::Op_BBS1(uint16_t src)
 	Op_BBSx(0x02, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS2(uint16_t src)
+void mos6502::Op_BBS2(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2176,7 +2178,7 @@ ITCM_CODE void mos6502::Op_BBS2(uint16_t src)
 	Op_BBSx(0x04, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS3(uint16_t src)
+void mos6502::Op_BBS3(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2184,7 +2186,7 @@ ITCM_CODE void mos6502::Op_BBS3(uint16_t src)
 	Op_BBSx(0x08, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS4(uint16_t src)
+void mos6502::Op_BBS4(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2192,7 +2194,7 @@ ITCM_CODE void mos6502::Op_BBS4(uint16_t src)
 	Op_BBSx(0x10, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS5(uint16_t src)
+void mos6502::Op_BBS5(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2200,7 +2202,7 @@ ITCM_CODE void mos6502::Op_BBS5(uint16_t src)
 	Op_BBSx(0x20, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS6(uint16_t src)
+void mos6502::Op_BBS6(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2208,7 +2210,7 @@ ITCM_CODE void mos6502::Op_BBS6(uint16_t src)
 	Op_BBSx(0x40, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_BBS7(uint16_t src)
+void mos6502::Op_BBS7(uint16_t src)
 {
 	auto val = Read(Read(pc++));
 	uint16_t offset = (uint16_t) Read(pc++);
@@ -2216,96 +2218,96 @@ ITCM_CODE void mos6502::Op_BBS7(uint16_t src)
 	Op_BBSx(0x80, val, offset);
 }
 
-ITCM_CODE void mos6502::Op_RMBx(uint8_t mask, uint16_t location)
+void mos6502::Op_RMBx(uint8_t mask, uint16_t location)
 {
 	uint8_t m = Read(location);
 	m = m & ~mask;
 	Write(location, m);
 }
 
-ITCM_CODE void mos6502::Op_SMBx(uint8_t mask, uint16_t location)
+void mos6502::Op_SMBx(uint8_t mask, uint16_t location)
 {
 	uint8_t m = Read(location);
 	m = m | mask;
 	Write(location, m);
 }
 
-ITCM_CODE void mos6502::Op_RMB0(uint16_t src)
+void mos6502::Op_RMB0(uint16_t src)
 {
 	Op_RMBx(1, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB1(uint16_t src)
+void mos6502::Op_RMB1(uint16_t src)
 {
 	Op_RMBx(2, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB2(uint16_t src)
+void mos6502::Op_RMB2(uint16_t src)
 {
 	Op_RMBx(4, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB3(uint16_t src)
+void mos6502::Op_RMB3(uint16_t src)
 {
 	Op_RMBx(8, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB4(uint16_t src)
+void mos6502::Op_RMB4(uint16_t src)
 {
 	Op_RMBx(16, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB5(uint16_t src)
+void mos6502::Op_RMB5(uint16_t src)
 {
 	Op_RMBx(32, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB6(uint16_t src)
+void mos6502::Op_RMB6(uint16_t src)
 {
 	Op_RMBx(64, src);
 }
 
-ITCM_CODE void mos6502::Op_RMB7(uint16_t src)
+void mos6502::Op_RMB7(uint16_t src)
 {
 	Op_RMBx(128, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB0(uint16_t src)
+void mos6502::Op_SMB0(uint16_t src)
 {
 	Op_SMBx(1, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB1(uint16_t src)
+void mos6502::Op_SMB1(uint16_t src)
 {
 	Op_SMBx(2, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB2(uint16_t src)
+void mos6502::Op_SMB2(uint16_t src)
 {
 	Op_SMBx(4, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB3(uint16_t src)
+void mos6502::Op_SMB3(uint16_t src)
 {
 	Op_SMBx(8, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB4(uint16_t src)
+void mos6502::Op_SMB4(uint16_t src)
 {
 	Op_SMBx(16, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB5(uint16_t src)
+void mos6502::Op_SMB5(uint16_t src)
 {
 	Op_SMBx(32, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB6(uint16_t src)
+void mos6502::Op_SMB6(uint16_t src)
 {
 	Op_SMBx(64, src);
 }
 
-ITCM_CODE void mos6502::Op_SMB7(uint16_t src)
+void mos6502::Op_SMB7(uint16_t src)
 {
 	Op_SMBx(128, src);
 }
