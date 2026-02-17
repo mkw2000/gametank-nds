@@ -2,6 +2,9 @@ using namespace std;
 
 #include "mos6502/mos6502.h"
 #include "SDL_inc.h"
+#ifdef NDS_BUILD
+#include "nds_acp_ipc.h"
+#endif
 
 #define ACP_RESET 0
 #define ACP_NMI 1
@@ -31,6 +34,24 @@ typedef struct ACPState {
 	// NDS: Run audio CPU at reduced rate (every Nth sample)
 	uint8_t audio_cycle_divider;
 	uint8_t audio_cycle_accum;
+#ifdef NDS_BUILD
+	int nds_channel;
+	uint8_t nds_buffer_index;
+	uint16_t nds_output_hz;
+	uint16_t nds_chunk_samples;
+	uint8_t nds_frames_until_refill;
+	uint32_t nds_pending_cycles;
+	static const uint16_t NDS_IPC_QUEUE_SIZE = 8192;
+	uint32_t nds_ipc_queue[NDS_IPC_QUEUE_SIZE];
+	uint16_t nds_ipc_head;
+	uint16_t nds_ipc_tail;
+	uint32_t nds_ipc_dropped;
+	bool nds_remote_ready;
+	int nds_last_sent_volume;
+	bool nds_last_sent_muted;
+	bool nds_last_sent_paused;
+	int16_t nds_stream_buffers[2][512];
+#endif
 } ACPState;
 
 class AudioCoprocessor {
@@ -48,4 +69,7 @@ public:
 	void dump_ram(const char* filename);
 	uint16_t get_irq_cycle_count();
 	static void fill_audio(void *udata, uint8_t *stream, int len);
+#ifdef NDS_BUILD
+	void TickNDSAudio();
+#endif
 };

@@ -6,14 +6,7 @@
 #define ITCM_CODE
 #endif
 
-#ifdef NDS_BUILD
-static inline void ITCM_CODE put_pixel16(uint16_t* surface, int x, int y, uint16_t pixel) {
-    if (!surface) {
-        return;
-    }
-    surface[(y * 128) + x] = pixel;
-}
-#else
+#ifndef NDS_BUILD
 static inline void put_pixel32(SDL_Surface* surface, int x, int y, Uint32 pixel) {
     if (!surface) {
         return;
@@ -119,7 +112,7 @@ void ITCM_CODE Blitter::ProcessCycle() {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
 #ifdef NDS_BUILD
-                put_pixel16(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColorRGB15(colorbus));
+                vram_surface[vramIndex] = Palette::ConvertColorRGB15(colorbus);
 #else
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
 #endif
@@ -366,7 +359,7 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
 #ifdef NDS_BUILD
-                put_pixel16(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColorRGB15(colorbus));
+                vram_surface[vramIndex] = Palette::ConvertColorRGB15(colorbus);
 #else
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
 #endif

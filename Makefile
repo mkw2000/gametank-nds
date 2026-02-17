@@ -19,6 +19,12 @@ TARGET   := gametank-nds
 BUILD    := build_nds
 SOURCES  := src src/mos6502
 INCLUDES := src
+ARM7_DIR := arm7
+PROJECT_ROOT ?= $(CURDIR)
+ARM7_ELF := $(PROJECT_ROOT)/$(ARM7_DIR)/gametank-arm7.elf
+
+# Use custom ARM7 binary instead of default ds7_maine.elf.
+_ARM7_ELF := -7 $(ARM7_ELF)
 
 #---------------------------------------------------------------------------------
 # Source files — core emulation only, no desktop GUI
@@ -46,12 +52,16 @@ CFLAGS   := -g -Wall -O2 -ffunction-sections -fdata-sections \
 	-DARM9 -DNDS_BUILD \
 	-DCPU_6502_STATIC -DCPU_6502_USE_LOCAL_HEADER -DCMOS_INDIRECT_JMP_FIX
 
+# Prefer throughput on ARM9 over code size.
+CFLAGS   := $(filter-out -O2,$(CFLAGS))
+CFLAGS   += -O3 -flto
+
 CFLAGS   += $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -std=c++17 -fno-rtti -fno-exceptions
 
 ASFLAGS  := -g $(ARCH)
 # Use ds9-legacy.specs explicitly to fix ENOSYS issues?
-LDFLAGS  = -specs=$(DEVKITPRO)/calico/share/ds9-legacy.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS  = -specs=$(DEVKITPRO)/calico/share/ds9-legacy.specs -g $(ARCH) -flto -Wl,-Map,$(notdir $*.map)
 
 # Libraries — ds_rules will auto-add calico
 LIBS     := -lfat -lfilesystem -lsysbase -lnds9 -lmm9
@@ -64,6 +74,7 @@ LIBDIRS  := $(LIBNDS)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export LD := $(CXX)
+export PROJECT_ROOT := $(CURDIR)
 export OUTPUT := $(CURDIR)/$(TARGET)
 export VPATH  := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
@@ -80,11 +91,13 @@ export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 .PHONY: $(BUILD) clean
 
 $(BUILD):
+	@$(MAKE) --no-print-directory -C $(CURDIR)/$(ARM7_DIR)
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 clean:
 	@echo clean ...
+	@$(MAKE) --no-print-directory -C $(CURDIR)/$(ARM7_DIR) clean || true
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
 
 #---------------------------------------------------------------------------------
@@ -92,7 +105,7 @@ else
 
 DEPENDS := $(OFILES:.o=.d)
 
-$(OUTPUT).nds: $(OUTPUT).elf
+$(OUTPUT).nds: $(OUTPUT).elf $(ARM7_ELF)
 $(OUTPUT).elf: $(OFILES)
 
 -include $(DEPENDS)

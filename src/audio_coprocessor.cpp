@@ -2,12 +2,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
+#include <cstring>
 
 #include "audio_coprocessor.h"
 #include "emulator_config.h"
+#ifdef NDS_BUILD
+#include <calico/nds/pxi.h>
+#endif
+
+#ifdef NDS_BUILD
+static inline uint16_t ACP_NextQueueIndex(uint16_t idx) {
+    return (uint16_t)((idx + 1) & (ACPState::NDS_IPC_QUEUE_SIZE - 1));
+}
+
+static inline uint8_t ACP_ClampVolumeU8(int volume) {
+    if (volume < 0) return 0;
+    if (volume > 255) return 255;
+    return (uint8_t)volume;
+}
+
+static inline void ACP_QueuePush(ACPState* state, uint32_t msg) {
+    uint16_t nextHead = ACP_NextQueueIndex(state->nds_ipc_head);
+    if (nextHead == state->nds_ipc_tail) {
+        if (state->nds_remote_ready) {
+            uint32_t old = state->nds_ipc_queue[state->nds_ipc_tail];
+            state->nds_ipc_tail = ACP_NextQueueIndex(state->nds_ipc_tail);
+            pxiSend((PxiChannel)NDS_ACP_PXI_CHANNEL, old);
+        } else {
+            state->nds_ipc_tail = ACP_NextQueueIndex(state->nds_ipc_tail);
+            state->nds_ipc_dropped++;
+        }
+    }
+    state->nds_ipc_queue[state->nds_ipc_head] = msg;
+    state->nds_ipc_head = nextHead;
+}
+#endif
 
 void AudioCoprocessor::ram_write(uint16_t address, uint8_t value) {
 	state.ram[address & 0xFFF] = value;
+#ifdef NDS_BUILD
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_RAM_WRITE, address & 0x0FFF, value));
+#endif
 }
 
 uint8_t AudioCoprocessor::ram_read(uint16_t address) {
@@ -23,8 +58,7 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
             break;
 		case ACP_NMI:
 #ifdef NDS_BUILD
-            state.cpu->NMI();
-            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
+            // ARM7 offload handles ACP_NMI behavior.
 #else
             SDL_LockAudioDevice(state.device);
             state.cpu->NMI();
@@ -39,20 +73,31 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 			state.irqRate = (((value << 1) & 0xFE) | (value & 1));
             state.running = (value & 0x80) != 0;
             state.cycles_per_sample = state.irqRate * state.clkMult;
-            state.samples_per_frame = 315000000 / (88 * 256 * 60);
+            if(state.clksPerHostSample != 0) {
+                state.samples_per_frame = (315000000 / 88 / 60) / state.clksPerHostSample;
+                if (state.samples_per_frame == 0) {
+                    state.samples_per_frame = 1;
+                }
+                if (state.samples_per_frame > 512) {
+                    state.samples_per_frame = 512;
+                }
+            }
             break;
 		default:
 			break;
 	}
+#ifdef NDS_BUILD
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_REG_WRITE, address & 7, value));
+#endif
 }
 
 void ITCM_CODE AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
     ACPState *state = (ACPState*) udata;
-    uint16_t *stream16 = (uint16_t*) stream;
+    int16_t *stream16 = (int16_t*) stream;
 
     // If emulation is paused, just fill buffer with zeroes without advancing the apu
     if (state->isEmulationPaused) {
-	for(int i = 0; i < len/sizeof(uint16_t); i++) {
+	for(int i = 0; i < len/(int)sizeof(int16_t); i++) {
 	    if(stream16 != NULL) {
 		stream16[i] = 0;
 	    }
@@ -61,40 +106,39 @@ void ITCM_CODE AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int le
 	return;
     }
 
-    for(int i = 0; i < len/sizeof(uint16_t); i++) {
+    for(int i = 0; i < len/(int)sizeof(int16_t); i++) {
         if(stream16 != NULL) {
-            stream16[i] = state->dacReg;
-            stream16[i] -= 128;
-            stream16[i] *= state->volume;
-            stream16[i] *= state->isMuted ? 0 : 1;
+            int sample = ((int)state->dacReg - 128) * state->volume;
+            if(state->isMuted) {
+                sample = 0;
+            } else {
+                if(sample > 32767) sample = 32767;
+                if(sample < -32768) sample = -32768;
+            }
+            stream16[i] = (int16_t)sample;
         }
         state->irqCounter -= state->clksPerHostSample;
         if(state->irqCounter < 0) {
             if(state->resetting) {
                 state->resetting = false;
-                state->cpu->Reset();
+                if(state->cpu) {
+                    state->cpu->Reset();
+                }
             }
             state->irqCounter += state->irqRate;
             state->cycle_counter = 0;
-            if(state->running) {
+            if(state->running && state->cpu) {
 #ifdef NDS_BUILD
-                // NDS optimization: skip audio CPU when it's waiting for interrupt
-                if(state->cpu->waiting) {
-                    // CPU is idle — just consume cycles without executing
-                    state->cycle_counter += state->cycles_per_sample;
-                } else {
-                    // Only run audio CPU every Nth IRQ to reduce overhead
-                    state->audio_cycle_accum++;
-                    if(state->audio_cycle_accum >= state->audio_cycle_divider) {
-                        state->audio_cycle_accum = 0;
-                        state->cpu->IRQ();
-                        state->cpu->ClearIRQ();
-                        state->cpu->RunOptimized(state->cycles_per_sample, state->cycle_counter);
-                    } else {
-                        // Still trigger IRQ so state stays correct
-                        state->cpu->IRQ();
-                        state->cpu->ClearIRQ();
-                    }
+                // Keep IRQ cadence exact, but batch CPU execution to reduce ARM9 overhead.
+                state->cpu->IRQ();
+                state->cpu->ClearIRQ();
+                state->nds_pending_cycles += (uint32_t)state->cycles_per_sample;
+                state->audio_cycle_accum++;
+
+                if(state->audio_cycle_accum >= state->audio_cycle_divider) {
+                    state->audio_cycle_accum = 0;
+                    state->cpu->RunOptimized((int32_t)state->nds_pending_cycles, state->cycle_counter);
+                    state->nds_pending_cycles = 0;
                 }
 #else
                 state->cpu->IRQ();
@@ -104,9 +148,48 @@ void ITCM_CODE AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int le
             }
         }
     }
+
+#ifdef NDS_BUILD
+    // Drain any remainder so interrupt responses don't get stuck across buffers.
+    if(state->running && state->nds_pending_cycles) {
+        state->cpu->RunOptimized((int32_t)state->nds_pending_cycles, state->cycle_counter);
+        state->nds_pending_cycles = 0;
+    }
+#endif
 }
 
 ACPState* AudioCoprocessor::singleton_acp_state;
+
+#ifdef NDS_BUILD
+void AudioCoprocessor::TickNDSAudio() {
+    if (!state.nds_remote_ready) {
+        return;
+    }
+
+    // Forward runtime controls (volume/mute/pause) to ARM7 when changed.
+    if (state.nds_last_sent_volume != state.volume) {
+        state.nds_last_sent_volume = state.volume;
+        ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_VOLUME, ACP_ClampVolumeU8(state.volume)));
+    }
+    if (state.nds_last_sent_muted != state.isMuted) {
+        state.nds_last_sent_muted = state.isMuted;
+        ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_MUTE, state.isMuted ? 1 : 0));
+    }
+    if (state.nds_last_sent_paused != state.isEmulationPaused) {
+        state.nds_last_sent_paused = state.isEmulationPaused;
+        ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_PAUSE, state.isEmulationPaused ? 1 : 0));
+    }
+
+    // Flush bounded number of queued messages to keep frame time stable.
+    int sent = 0;
+    while ((state.nds_ipc_tail != state.nds_ipc_head) && (sent < 256)) {
+        uint32_t msg = state.nds_ipc_queue[state.nds_ipc_tail];
+        state.nds_ipc_tail = ACP_NextQueueIndex(state.nds_ipc_tail);
+        pxiSend((PxiChannel)NDS_ACP_PXI_CHANNEL, msg);
+        ++sent;
+    }
+}
+#endif
 
 __attribute__((always_inline)) inline uint8_t ACP_MemoryRead(uint16_t address) {
     return AudioCoprocessor::singleton_acp_state->ram[address & 0xFFF];
@@ -153,12 +236,27 @@ void ACP_CPUStopped() {
 
 void AudioCoprocessor::StartAudio() {
 #ifdef NDS_BUILD
-    // On DS, we run audio in sync with the main loop via fill_audio()
-    // called from the main emulation loop (EmulatorConfig::noSound path).
-    // The DS sound hardware will be driven from the fill_audio output.
-    // soundEnable(); // Creates a crash on DSi with calico ARM7
-    // printf(" ACP: DISABLED soundEnable() to prevent crash\n");
-    state.clksPerHostSample = 315000000 / (88 * 22050);
+    state.nds_ipc_head = 0;
+    state.nds_ipc_tail = 0;
+    state.nds_ipc_dropped = 0;
+    state.nds_remote_ready = false;
+    state.nds_last_sent_volume = -1;
+    state.nds_last_sent_muted = !state.isMuted;
+    state.nds_last_sent_paused = !state.isEmulationPaused;
+
+    // Wait until ARM7 side has installed a handler/mailbox for this channel.
+    pxiWaitRemote((PxiChannel)NDS_ACP_PXI_CHANNEL);
+    state.nds_remote_ready = true;
+
+    // Force initial synchronization of basic controls.
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_VOLUME, ACP_ClampVolumeU8(state.volume)));
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_MUTE, state.isMuted ? 1 : 0));
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_CONTROL, NDS_ACP_CTRL_PAUSE, state.isEmulationPaused ? 1 : 0));
+
+    // Reset ARM7 ACP state at startup.
+    ACP_QueuePush(&state, ndsAcpPackMsg(NDS_ACP_CMD_REG_WRITE, ACP_RESET, 0));
+    TickNDSAudio();
+
     state.format = AUDIO_S16LSB;
     state.device = 1; // dummy non-zero value
 #else
@@ -193,7 +291,11 @@ void AudioCoprocessor::StartAudio() {
 AudioCoprocessor::AudioCoprocessor() {
 	AudioCoprocessor::singleton_acp_state = &state;
 
+#ifdef NDS_BUILD
+    state.cpu = NULL;
+#else
     state.cpu = new mos6502(ACP_MemoryRead, ACP_MemoryWrite, ACP_CPUStopped, ACP_CPUSync);
+#endif
 
     state.irqCounter = 0;
     state.irqRate = 0;
@@ -201,22 +303,39 @@ AudioCoprocessor::AudioCoprocessor() {
     state.running = false;
     state.clksPerHostSample = 0;
     state.cycles_per_sample = 1024;
-    state.samples_per_frame = 233;
+    state.samples_per_frame = 367;
     state.last_irq_cycles = 0;
-    state.volume = 256;
+    state.volume = 255;
     state.isMuted = false;
     state.isEmulationPaused = false;
 #ifdef NDS_BUILD
-    state.audio_cycle_divider = 4;  // Run audio CPU every 4th IRQ on NDS
+    state.audio_cycle_divider = 1;
+    state.nds_channel = -1;
+    state.nds_buffer_index = 0;
+    state.nds_output_hz = 0;
+    state.nds_chunk_samples = 0;
+    state.nds_frames_until_refill = 0;
+    state.nds_pending_cycles = 0;
+    state.nds_ipc_head = 0;
+    state.nds_ipc_tail = 0;
+    state.nds_ipc_dropped = 0;
+    state.nds_remote_ready = false;
+    state.nds_last_sent_volume = -1;
+    state.nds_last_sent_muted = false;
+    state.nds_last_sent_paused = false;
 #else
     state.audio_cycle_divider = 1;  // Full rate on desktop
 #endif
     state.audio_cycle_accum = 0;
     state.clkMult = 4;
 
+#ifdef NDS_BUILD
+    memset(state.ram, 0, AUDIO_RAM_SIZE);
+#else
 	for(int i = 0; i < AUDIO_RAM_SIZE; i ++) {
 		state.ram[i] = rand() % 256;
 	}
+#endif
 
     if(!EmulatorConfig::noSound) {
         StartAudio();

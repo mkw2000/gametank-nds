@@ -2,7 +2,9 @@
 #ifdef NDS_BUILD
 
 #include <nds.h>
+#if defined(ARM9)
 #include <fat.h>
+#endif
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -14,10 +16,29 @@
 // ITCM: 32KB zero wait-state instruction memory
 // DTCM: 16KB zero wait-state data memory
 //=============================================================================
+#if defined(ARM9)
+#ifndef ITCM_CODE
 #define ITCM_CODE __attribute__((section(".itcm"), long_call))
+#endif
+#ifndef DTCM_DATA
 #define DTCM_DATA __attribute__((section(".dtcm")))
+#endif
 #ifndef DTCM_BSS
 #define DTCM_BSS  __attribute__((section(".dtcm.bss")))
+#endif
+#else
+#ifdef ITCM_CODE
+#undef ITCM_CODE
+#endif
+#define ITCM_CODE
+#ifdef DTCM_DATA
+#undef DTCM_DATA
+#endif
+#define DTCM_DATA
+#ifdef DTCM_BSS
+#undef DTCM_BSS
+#endif
+#define DTCM_BSS
 #endif
 
 //=============================================================================

@@ -251,13 +251,18 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 #define RAM_HIGHBITS_SHIFT 7
 
 // Cached ram_base: updated whenever banking register ($2005) changes
-static uint16_t cached_ram_base = 0;
+uint16_t cached_ram_base = 0;
 
 static inline void UpdateBankingCache() {
 	cached_ram_base = (system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
 }
 
 #define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
+
+#ifndef LIKELY
+#define LIKELY(x)   __builtin_expect(!!(x), 1)
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#endif
 
 extern unsigned char font_map[];
 
@@ -400,7 +405,7 @@ uint8_t ITCM_CODE MemoryRead_Flash2M(uint16_t address) {
 	}
 }
 
-uint8_t ITCM_CODE MemoryRead_Unknown(uint16_t address) {
+uint8_t MemoryRead_Unknown(uint16_t address) {
 	//If cartridge_state.size is smaller than unbanked ROM range, align end with 0xFFFF and wrap
 	//If cartridge_state.size is bigger than unbanked ROM range, access mainWindow at end of file.
 	//TODO: Decide if unknown ROM type should just terminate emulator :P
@@ -411,11 +416,26 @@ uint8_t ITCM_CODE MemoryRead_Unknown(uint16_t address) {
 	}
 }
 
-uint8_t* ITCM_CODE GetRAM(const uint16_t address) {
+static inline uint8_t ITCM_CODE MemoryReadRomFast(uint16_t address) {
+	// Most GameTank ROMs are FLASH2M-style and spend most cycles in this path.
+	const RomType romType = loadedRomType;
+	if(LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
+		return MemoryRead_Flash2M(address);
+	}
+	if(romType == RomType::EEPROM32K) {
+		return cartridge_state.rom[address & 0x7FFF];
+	}
+	if(romType == RomType::EEPROM8K) {
+		return cartridge_state.rom[address & 0x1FFF];
+	}
+	return MemoryRead_Unknown(address);
+}
+
+uint8_t* GetRAM(const uint16_t address) {
 	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
 }
 
-uint8_t ITCM_CODE MemoryReadResolve(const uint16_t address, bool stateful) {
+uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 	if(address & 0x8000) {
 		switch(loadedRomType) {
 			case RomType::EEPROM8K:
@@ -450,16 +470,38 @@ uint8_t ITCM_CODE MemoryReadResolve(const uint16_t address, bool stateful) {
 	return open_bus();
 }
 
-uint8_t ITCM_CODE MemoryRead(uint16_t address) {
+uint8_t MemoryRead(uint16_t address) {
 	return MemoryReadResolve(address, true);
 }
 
 // Fast path for the main CPU: zero page reads bypass MemoryReadResolve entirely
 uint8_t ITCM_CODE MemoryReadFast(uint16_t address) {
-	if(address < 0x2000) {
+	// Instruction fetches are overwhelmingly in ROM space.
+	if(LIKELY(address & 0x8000)) {
+		return MemoryReadRomFast(address);
+	}
+
+	if(LIKELY(address < 0x2000)) {
 		return system_state.ram[FULL_RAM_ADDRESS(address)];
 	}
-	return MemoryReadResolve(address, true);
+
+	if(address & 0x4000) {
+		return VDMA_Read(address);
+	}
+
+	if((address >= 0x3000) && (address <= 0x3FFF)) {
+		return soundcard->ram_read(address);
+	}
+
+	if((address >= 0x2800) && (address <= 0x2FFF)) {
+		return system_state.VIA_regs[address & 0xF];
+	}
+
+	if((address == 0x2008) || (address == 0x2009)) {
+		return joysticks->read((uint8_t) address, true);
+	}
+
+	return open_bus();
 }
 
 uint8_t MemorySync(uint16_t address) {
@@ -479,10 +521,21 @@ uint8_t MemorySync(uint16_t address) {
 		}
 	}
 #endif
+#ifdef NDS_BUILD
+	return MemoryReadFast(address);
+#else
 	return MemoryRead(address);
+#endif
 }
 
 void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
+	// Most writes are to CPU RAM.
+	if(LIKELY(address < 0x2000)) {
+		system_state.ram_initialized[FULL_RAM_ADDRESS(address)] = true;
+		system_state.ram[FULL_RAM_ADDRESS(address)] = value;
+		return;
+	}
+
 	if(address & 0x8000) {
 		if(loadedRomType == RomType::FLASH2M_RAM32K) {
 			if(!(address & 0x4000)) {
@@ -620,13 +673,6 @@ void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 				soundcard->register_write(address, value);
 			}
 		}
-	}
-	else if(address < 0x2000) {
-		/*if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
-			printf("First RAM write at %x (Bank %x) (Value %x)\n", address, system_state.banking >> 6, value);
-		}*/
-		system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)] = true;
-		system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)] = value;
 	}
 }
 
@@ -1275,7 +1321,7 @@ static void ndsMenuHandleInput() {
 			if (ndsMenu.cursor == NDS_ITEM_VOLUME) {
 				int& vol = AudioCoprocessor::singleton_acp_state->volume;
 				vol += 16;
-				if (vol > 256) vol = 256;
+				if (vol > 255) vol = 255;
 				ndsMenu.needsRedraw = true;
 			} else if (ndsMenu.cursor == NDS_ITEM_FRAMESKIP) {
 				ndsFrameSkip++;
@@ -1471,7 +1517,7 @@ void refreshScreen() {
 					toggleControllerOptionsWindow();
 				}
 				ImGui::MenuItem("Toggle Instant Blits", NULL, &(blitter->instant_mode));
-				ImGui::SliderInt("Volume", &AudioCoprocessor::singleton_acp_state->volume, 0, 256);
+				ImGui::SliderInt("Volume", &AudioCoprocessor::singleton_acp_state->volume, 0, 255);
 				ImGui::Checkbox("Mute", &AudioCoprocessor::singleton_acp_state->isMuted);
 				if(ImGui::BeginMenu("Pallete")) {
 					ImGui::RadioButton("Unscaled Capture", &palette_select, PALETTE_SELECT_CAPTURE);
@@ -1551,7 +1597,7 @@ void refreshScreen() {
 			if (ImGui::MenuItem("Toggle Full Screen")) {
 				toggleFullScreen();
 			}
-			ImGui::SliderInt("Volume", &AudioCoprocessor::singleton_acp_state->volume, 0, 256, "", ImGuiSliderFlags_NoInput);
+			ImGui::SliderInt("Volume", &AudioCoprocessor::singleton_acp_state->volume, 0, 255, "", ImGuiSliderFlags_NoInput);
 			bool appMute = (muteMask & MUTE_SOURCE_MANUAL) != 0;
 			ImGui::Checkbox("Mute Audio", &appMute);
 			if(appMute) muteMask |= MUTE_SOURCE_MANUAL;
@@ -1748,9 +1794,14 @@ EM_BOOL mainloop(double time, void* userdata) {
 		blitter->CatchUp();
 		
 
+#ifdef NDS_BUILD
+		// ARM9 side only forwards ACP commands; synthesis runs on ARM7.
+		soundcard->TickNDSAudio();
+#else
 		if(EmulatorConfig::noSound) {
 			AudioCoprocessor::fill_audio(AudioCoprocessor::singleton_acp_state, NULL, AudioCoprocessor::singleton_acp_state->samples_per_frame);
 		}
+#endif
 
 #ifdef NDS_BUILD
 		// NDS: menu toggle with L or R
@@ -2007,7 +2058,11 @@ int main(int argC, char* argV[]) {
 
 	joysticks = new JoystickAdapter();
 	soundcard = new AudioCoprocessor();
+#ifdef NDS_BUILD
+	cpu_core = new mos6502(MemoryReadFast, MemoryWrite, CPUStopped, NULL);
+#else
 	cpu_core = new mos6502(MemoryReadFast, MemoryWrite, CPUStopped, MemorySync);
+#endif
 	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
