@@ -10,6 +10,17 @@
 #include <sys/stat.h>
 
 //=============================================================================
+// ARM9 Tightly-Coupled Memory (TCM) attributes
+// ITCM: 32KB zero wait-state instruction memory
+// DTCM: 16KB zero wait-state data memory
+//=============================================================================
+#define ITCM_CODE __attribute__((section(".itcm"), long_call))
+#define DTCM_DATA __attribute__((section(".dtcm")))
+#ifndef DTCM_BSS
+#define DTCM_BSS  __attribute__((section(".dtcm.bss")))
+#endif
+
+//=============================================================================
 // SDL type stubs
 // The GameTank emulator core writes to SDL_Surface pixel buffers and uses
 // various SDL types throughout. Rather than rewriting every file, we provide

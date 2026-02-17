@@ -1,5 +1,10 @@
 
 #include "mos6502.h"
+#include "SDL_inc.h"
+
+#ifndef ITCM_CODE
+#define ITCM_CODE
+#endif
 
 mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
 {
@@ -2305,7 +2310,7 @@ void mos6502::Op_SMB7(uint16_t src)
 	Op_SMBx(128, src);
 }
 
-void mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCount) {
+void ITCM_CODE mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCount) {
     uint8_t opcode;
     uint8_t elapsedCycles;
     uint16_t src;

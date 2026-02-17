@@ -442,7 +442,7 @@ uint8_t MemoryRead(uint16_t address) {
 }
 
 // Fast path for the main CPU: zero page reads bypass MemoryReadResolve entirely
-__attribute__((always_inline)) inline uint8_t MemoryReadFast(uint16_t address) {
+uint8_t ITCM_CODE MemoryReadFast(uint16_t address) {
 	if(address < 0x100) {
 		return system_state.ram[FULL_RAM_ADDRESS(address)];
 	}
@@ -469,7 +469,7 @@ uint8_t MemorySync(uint16_t address) {
 	return MemoryRead(address);
 }
 
-void MemoryWrite(uint16_t address, uint8_t value) {
+void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 	if(address & 0x8000) {
 		if(loadedRomType == RomType::FLASH2M_RAM32K) {
 			if(!(address & 0x4000)) {
