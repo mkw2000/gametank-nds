@@ -77,9 +77,30 @@ void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
             state->irqCounter += state->irqRate;
             state->cycle_counter = 0;
             if(state->running) {
+#ifdef NDS_BUILD
+                // NDS optimization: skip audio CPU when it's waiting for interrupt
+                if(state->cpu->waiting) {
+                    // CPU is idle — just consume cycles without executing
+                    state->cycle_counter += state->cycles_per_sample;
+                } else {
+                    // Only run audio CPU every Nth IRQ to reduce overhead
+                    state->audio_cycle_accum++;
+                    if(state->audio_cycle_accum >= state->audio_cycle_divider) {
+                        state->audio_cycle_accum = 0;
+                        state->cpu->IRQ();
+                        state->cpu->ClearIRQ();
+                        state->cpu->RunOptimized(state->cycles_per_sample, state->cycle_counter);
+                    } else {
+                        // Still trigger IRQ so state stays correct
+                        state->cpu->IRQ();
+                        state->cpu->ClearIRQ();
+                    }
+                }
+#else
                 state->cpu->IRQ();
                 state->cpu->ClearIRQ();
                 state->cpu->RunOptimized(state->cycles_per_sample, state->cycle_counter);
+#endif
             }
         }
     }
@@ -185,6 +206,12 @@ AudioCoprocessor::AudioCoprocessor() {
     state.volume = 256;
     state.isMuted = false;
     state.isEmulationPaused = false;
+#ifdef NDS_BUILD
+    state.audio_cycle_divider = 4;  // Run audio CPU every 4th IRQ on NDS
+#else
+    state.audio_cycle_divider = 1;  // Full rate on desktop
+#endif
+    state.audio_cycle_accum = 0;
     state.clkMult = 4;
 
 	for(int i = 0; i < AUDIO_RAM_SIZE; i ++) {

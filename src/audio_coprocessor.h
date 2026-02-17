@@ -28,6 +28,9 @@ typedef struct ACPState {
 	int volume;
 	bool isMuted;
 	bool isEmulationPaused;
+	// NDS: Run audio CPU at reduced rate (every Nth sample)
+	uint8_t audio_cycle_divider;
+	uint8_t audio_cycle_accum;
 } ACPState;
 
 class AudioCoprocessor {
