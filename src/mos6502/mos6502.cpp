@@ -2338,6 +2338,9 @@ void ITCM_CODE mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCou
                     break;
                 }
             } else {
+                // Consume all remaining cycles to fast-forward time
+                cycleCount += cyclesRemaining;
+                cyclesRemaining = 0;
                 break;
             }
         } else if(irq_line) {
@@ -2352,6 +2355,19 @@ void ITCM_CODE mos6502::RunOptimized(int32_t cyclesRemaining, uint64_t& cycleCou
             --pc;
             cyclesRemaining = 0;
             break;
+        }
+
+        // Spin-loop detection: BRA -2 (0x80 0xFE) is effectively WAI
+        if (opcode == 0x80) {
+             // Peek next byte without advancing PC yet (Read is idempotent for RAM/ROM)
+             uint8_t offset = Read(pc);
+             if (offset == 0xFE) {
+                 // Found BRA -2 loop. Treat as waiting state.
+                 // Back up PC to point to the opcode so we resume correctly after interrupt
+                 pc--;
+                 waiting = true;
+                 continue;
+             }
         }
 
         elapsedCycles = 0;
