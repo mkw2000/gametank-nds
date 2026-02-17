@@ -1699,12 +1699,25 @@ EM_BOOL mainloop(double time, void* userdata) {
 					profiler.ResetTimers();
 					profiler.last_blitter_activity = blitter->pixels_this_frame;
 					blitter->pixels_this_frame = 0;
-				}
 #endif
 			}
 		} else {
 #ifdef NDS_BUILD
-				swiWaitForVBlank();
+        // DEBUG: R toggles Audio, L toggles VSync
+        scanKeys();
+        uint32_t keys = keysDown();
+        static bool enableVSync = true;
+        static bool enableAudio = true;
+        
+        if (keys & KEY_L) {
+            enableVSync = !enableVSync;
+        }
+        if (keys & KEY_R) {
+            enableAudio = !enableAudio;
+            AudioCoprocessor::singleton_acp_state->running = enableAudio;
+        }
+
+        if (enableVSync) swiWaitForVBlank();
 #else
 				SDL_Delay(16);
 #endif

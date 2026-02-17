@@ -198,6 +198,51 @@ void Blitter::ProcessBatch(uint64_t cycles) {
 #endif
 
 #ifdef NDS_BUILD
+    // NDS Fast Path: Colorfill
+    if (colorfill && !wrapX && !wrapY) {
+         uint8_t color8 = fillColor;
+         uint16_t color16 = Palette::rgb15_lut[color8 + palette_select];
+         
+         while (cycles > 0 && running && !init) {
+            uint8_t rowPixels = counterW;
+            if (rowPixels == 0) rowPixels = params[PARAM_WIDTH] & 0x7F;
+            uint64_t toProcess = (cycles < rowPixels) ? cycles : rowPixels;
+            if (toProcess == 0) { ProcessCycle(); cycles--; continue; }
+
+            int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
+            uint8_t* dstPtr = &system_state->vram[vramIndex];
+            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+
+            for(uint64_t i = 0; i < toProcess; i++) {
+                *dstPtr++ = color8;
+                *dst15Ptr++ = color16;
+            }
+            
+            counterW -= toProcess;
+            counterVX += toProcess;
+            counterGX += toProcess; 
+            pixels_this_frame += toProcess;
+            cycles -= toProcess;
+
+            if (counterW == 0) {
+                counterVY++;
+                counterGY = GCARRY(counterGY); 
+                --counterH;
+                
+                counterW = params[PARAM_WIDTH] & 0x7F;
+                counterVX = params[PARAM_VX];
+                counterGX = params[PARAM_GX];
+                
+                if (COPYDONE) {
+                    running = false;
+                    irq = true;
+                    break;
+                }
+            }
+        }
+        return;
+    }
+
     // NDS Medium Path: Standard 1:1 copy without GCARRY flag
     // Many operations are simple copies but don't set the specific GCARRY bit.
     // If no scaling/flipping/wrapping/colorfill is active, we can treat it as linear.
