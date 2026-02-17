@@ -136,6 +136,67 @@ void Blitter::ProcessBatch(uint64_t cycles) {
     const int yShift = vramPage ? 128 : 0;
     const int vOffset = yShift << 7;
 
+#ifdef NDS_BUILD
+    // NDS Fast Path: Linear copy (GCARRY set, xDir positive)
+    // Most sprites and backgrounds use this mode.
+    // We can avoid the expensive coordinate recalculation per pixel.
+    if ((system_state->dma_control & DMA_GCARRY_BIT) && !xDir && !wrapX && !wrapY && !colorfill) {
+        while (cycles > 0 && running && !init) {
+            uint8_t rowPixels = counterW;
+            if (rowPixels == 0) rowPixels = params[PARAM_WIDTH] & 0x7F;
+            uint64_t toProcess = (cycles < rowPixels) ? cycles : rowPixels;
+            if (toProcess == 0) { ProcessCycle(); cycles--; continue; }
+
+            // Linear pointers
+            // GX/GY are combined into linear GRAM address
+            uint32_t gOffset = ComputeGOffset(system_state, counterGY, counterGX);
+            uint32_t gx_linear = ((counterGY & 0x7F) << 7) | (counterGX & 0x7F);
+            uint8_t* srcPtr = &system_state->gram[gx_linear | gOffset];
+            
+            // VX/VY linear VRAM address
+            int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
+            uint8_t* dstPtr = &system_state->vram[vramIndex];
+            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+
+            // Run the batch
+            for (uint64_t i = 0; i < toProcess; i++) {
+                uint8_t colorbus = *srcPtr++;
+                if (!transparency || colorbus != 0) {
+                    *dstPtr = colorbus;
+                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
+                }
+                dstPtr++;
+                dst15Ptr++;
+            }
+
+            // Update counters
+            counterW -= toProcess;
+            counterGX += toProcess; // We know GCARRY is set, so simple add
+            counterVX += toProcess;
+            pixels_this_frame += toProcess;
+            cycles -= toProcess;
+
+            // Row end logic
+            if (counterW == 0) {
+                counterVY++;
+                counterGY = GCARRY(counterGY); // Y might still wrap/carry normally
+                --counterH;
+                
+                counterW = params[PARAM_WIDTH] & 0x7F;
+                counterVX = params[PARAM_VX];
+                counterGX = params[PARAM_GX];
+
+                if (COPYDONE) {
+                    running = false;
+                    irq = true;
+                    break;
+                }
+            }
+        }
+        return;
+    }
+#endif
+
     while(cycles > 0 && running && !init) {
         // How many pixels remaining in current row?
         uint8_t rowPixels = counterW;
@@ -179,7 +240,9 @@ void Blitter::ProcessBatch(uint64_t cycles) {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
                 system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
+#ifndef NDS_BUILD
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
+#endif
             }
             ++pixels_this_frame;
         }
