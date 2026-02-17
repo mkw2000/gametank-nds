@@ -172,12 +172,10 @@ void Blitter::ProcessBatch(uint64_t cycles) {
                 colorbus = system_state->gram[((gy & 0x7F) << 7) | (gx & 0x7F) | gOffset];
             }
 
-            // Write to VRAM if conditions met (unless output is suppressed)
-            bool shouldWrite = !suppress_output &&
-                               (transparency || colorbus != 0) &&
-                               !((counterVX & 0x80) && wrapX) &&
-                               !((counterVY & 0x80) && wrapY);
-            if (shouldWrite) {
+            // Write to VRAM if conditions met (ProcessBatch is fast path - no suppress check here)
+            if((transparency || colorbus != 0)
+                && !((counterVX & 0x80) && wrapX)
+                && !((counterVY & 0x80) && wrapY)) {
                 system_state->vram[((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset] = colorbus;
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
             }
