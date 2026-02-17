@@ -1249,17 +1249,17 @@ static void NDSPerfMaybePrint() {
 		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / cpuDelta);
 		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / cpuDelta);
 		const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / cpuDelta);
-		printf("OP:%02X %2lu %02X %2lu %02X %2lu      \n",
+		printf("OP:%02X/%2lu %02X/%2lu %02X/%2lu    \n",
 			(unsigned int)topOps[0], (unsigned long)p0,
 			(unsigned int)topOps[1], (unsigned long)p1,
 			(unsigned int)topOps[2], (unsigned long)p2);
-		printf("EX:%4lu/%4lu/%4lu            \n",
-			(unsigned long)(topOpExec[0] > 9999 ? 9999 : topOpExec[0]),
-			(unsigned long)(topOpExec[1] > 9999 ? 9999 : topOpExec[1]),
-			(unsigned long)(topOpExec[2] > 9999 ? 9999 : topOpExec[2]));
+		printf("EX:%5lu/%5lu/%5lu        \n",
+			(unsigned long)(topOpExec[0] > 99999 ? 99999 : topOpExec[0]),
+			(unsigned long)(topOpExec[1] > 99999 ? 99999 : topOpExec[1]),
+			(unsigned long)(topOpExec[2] > 99999 ? 99999 : topOpExec[2]));
 	} else {
-		printf("OP:-- -- -- -- -- --          \n");
-		printf("EX:   0/   0/   0             \n");
+		printf("OP:--/-- --/-- --/--        \n");
+		printf("EX:    0/    0/    0         \n");
 	}
 }
 

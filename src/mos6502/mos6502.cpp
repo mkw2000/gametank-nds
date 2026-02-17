@@ -1454,6 +1454,48 @@ void mos6502::Run(
 		// Direct opcode dispatch on ARM9 avoids per-instruction member function pointer indirection.
 #if defined(NDS_BUILD) && defined(ARM9)
 		switch(opcode) {
+			case 0xAD: { // LDA ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				A = ReadBus((uint16_t)(lo | (hi << 8)));
+				SetNZFast(A);
+				elapsedCycles = 4;
+				break;
+			}
+			case 0xA5: { // LDA ZER
+				const uint16_t addr = FetchByte();
+				A = ReadBus(addr);
+				SetNZFast(A);
+				elapsedCycles = 3;
+				break;
+			}
+			case 0xA9: { // LDA IMM
+				A = FetchByte();
+				SetNZFast(A);
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x8D: { // STA ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				WriteBus((uint16_t)(lo | (hi << 8)), A);
+				elapsedCycles = 4;
+				break;
+			}
+			case 0x85: { // STA ZER
+				const uint16_t addr = FetchByte();
+				WriteBus(addr, A);
+				elapsedCycles = 3;
+				break;
+			}
+			case 0xB2: { // LDA ZPI
+				const uint8_t zp = FetchByte();
+				const uint16_t addr = (uint16_t)(ReadBus(zp) | (ReadBus((uint8_t)(zp + 1)) << 8));
+				A = ReadBus(addr);
+				SetNZFast(A);
+				elapsedCycles = 5;
+				break;
+			}
 			case 0x49: { // EOR IMM
 				A ^= FetchByte();
 				SetNZFast(A);

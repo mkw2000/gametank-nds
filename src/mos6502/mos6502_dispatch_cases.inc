@@ -78,15 +78,11 @@ case 0XC8: { src = Addr_IMP(); Op_INY(src); elapsedCycles = 2; break; }
 case 0X4C: { src = Addr_ABS(); Op_JMP(src); elapsedCycles = 3; break; }
 case 0X6C: { src = Addr_ABI(); Op_JMP(src); elapsedCycles = 5; break; }
 case 0X20: { src = Addr_ABS(); Op_JSR(src); elapsedCycles = 6; break; }
-case 0XA9: { src = Addr_IMM(); Op_LDA(src); elapsedCycles = 2; break; }
-case 0XAD: { src = Addr_ABS(); Op_LDA(src); elapsedCycles = 4; break; }
-case 0XA5: { src = Addr_ZER(); Op_LDA(src); elapsedCycles = 3; break; }
 case 0XA1: { src = Addr_INX(); Op_LDA(src); elapsedCycles = 6; break; }
 case 0XB1: { src = Addr_INY(); Op_LDA(src); elapsedCycles = 5; break; }
 case 0XB5: { src = Addr_ZEX(); Op_LDA(src); elapsedCycles = 4; break; }
 case 0XBD: { src = Addr_ABX(); Op_LDA(src); elapsedCycles = 4; break; }
 case 0XB9: { src = Addr_ABY(); Op_LDA(src); elapsedCycles = 4; break; }
-case 0XB2: { src = Addr_ZPI(); Op_LDA(src); elapsedCycles = 5; break; }
 case 0XA2: { src = Addr_IMM(); Op_LDX(src); elapsedCycles = 2; break; }
 case 0XAE: { src = Addr_ABS(); Op_LDX(src); elapsedCycles = 4; break; }
 case 0XA6: { src = Addr_ZER(); Op_LDX(src); elapsedCycles = 3; break; }
@@ -143,8 +139,6 @@ case 0XF2: { src = Addr_ZPI(); Op_SBC(src); elapsedCycles = 5; break; }
 case 0X38: { src = Addr_IMP(); Op_SEC(src); elapsedCycles = 2; break; }
 case 0XF8: { src = Addr_IMP(); Op_SED(src); elapsedCycles = 2; break; }
 case 0X78: { src = Addr_IMP(); Op_SEI(src); elapsedCycles = 2; break; }
-case 0X8D: { src = Addr_ABS(); Op_STA(src); elapsedCycles = 4; break; }
-case 0X85: { src = Addr_ZER(); Op_STA(src); elapsedCycles = 3; break; }
 case 0X81: { src = Addr_INX(); Op_STA(src); elapsedCycles = 6; break; }
 case 0X91: { src = Addr_INY(); Op_STA(src); elapsedCycles = 6; break; }
 case 0X95: { src = Addr_ZEX(); Op_STA(src); elapsedCycles = 4; break; }
