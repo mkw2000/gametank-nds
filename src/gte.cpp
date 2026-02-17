@@ -1111,6 +1111,7 @@ static void ndsMenuDrawMain() {
 		"Reset",
 		NULL, // Mute (dynamic)
 		NULL, // Volume (dynamic)
+		NULL, // Frame Skip (dynamic)
 		"Exit"
 	};
 
