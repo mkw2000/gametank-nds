@@ -6,24 +6,22 @@
 #define ITCM_CODE
 #endif
 
-Uint32 get_pixel32( SDL_Surface *surface, int x, int y )
-{
-    //Convert the pixels to 32 bit
-    Uint32 *pixels = (Uint32 *)surface->pixels;
-
-    //Get the requested pixel
-    return pixels[ ( y * surface->w ) + x ];
+#ifdef NDS_BUILD
+static inline void ITCM_CODE put_pixel16(uint16_t* surface, int x, int y, uint16_t pixel) {
+    if (!surface) {
+        return;
+    }
+    surface[(y * 128) + x] = pixel;
 }
-
-void ITCM_CODE put_pixel32( SDL_Surface *surface, int x, int y, Uint32 pixel )
-{
-    if(!surface) return;
-    //Convert the pixels to 32 bit
-    Uint32 *pixels = (Uint32 *)surface->pixels;
-
-    //Set the pixel
-    pixels[ ( y * surface->w ) + x ] = pixel;
+#else
+static inline void put_pixel32(SDL_Surface* surface, int x, int y, Uint32 pixel) {
+    if (!surface) {
+        return;
+    }
+    Uint32* pixels = (Uint32*)surface->pixels;
+    pixels[(y * surface->w) + x] = pixel;
 }
+#endif
 
 void Blitter::SetParam(uint8_t address, uint8_t value) {
     if((address % DMA_PARAMS_COUNT) == PARAM_TRIGGER) {
@@ -120,8 +118,9 @@ void ITCM_CODE Blitter::ProcessCycle() {
                 int vOffset = yShift << 7;
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
-                system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
-#ifndef NDS_BUILD
+#ifdef NDS_BUILD
+                put_pixel16(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColorRGB15(colorbus));
+#else
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
 #endif
             }
@@ -164,14 +163,14 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
             // VX/VY linear VRAM address
             int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
             uint8_t* dstPtr = &system_state->vram[vramIndex];
-            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+            uint16_t* dst15Ptr = &vram_surface[vramIndex];
 
             // Run the batch
             for (uint64_t i = 0; i < toProcess; i++) {
                 uint8_t colorbus = *srcPtr++;
                 if (!transparency || colorbus != 0) {
                     *dstPtr = colorbus;
-                    *dst15Ptr = Palette::rgb15_lut[colorbus + palette_select];
+                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
                 }
                 dstPtr++;
                 dst15Ptr++;
@@ -209,7 +208,7 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
     // NDS Fast Path: Colorfill
     if (colorfill && !wrapX && !wrapY) {
          uint8_t color8 = fillColor;
-         uint16_t color16 = Palette::rgb15_lut[color8 + palette_select];
+         uint16_t color16 = Palette::ConvertColorRGB15(color8);
          
          while (cycles > 0 && running && !init) {
             uint8_t rowPixels = counterW;
@@ -219,7 +218,7 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
 
             int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
             uint8_t* dstPtr = &system_state->vram[vramIndex];
-            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+            uint16_t* dst15Ptr = &vram_surface[vramIndex];
 
             for(uint64_t i = 0; i < toProcess; i++) {
                 *dstPtr++ = color8;
@@ -273,7 +272,7 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
             
             int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
             uint8_t* dstPtr = &system_state->vram[vramIndex];
-            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+            uint16_t* dst15Ptr = &vram_surface[vramIndex];
             
             // Check if we can just memcpy? 
             // Only if transparency is off.
@@ -287,7 +286,7 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
                 // Write
                 if (!transparency || colorbus != 0) {
                     *dstPtr = colorbus;
-                    *dst15Ptr = Palette::rgb15_lut[colorbus + palette_select];
+                    *dst15Ptr = Palette::ConvertColorRGB15(colorbus);
                 }
                 dstPtr++; // VX increments by 1
                 dst15Ptr++;
@@ -366,8 +365,9 @@ void ITCM_CODE Blitter::ProcessBatch(uint64_t cycles) {
                 && !((counterVY & 0x80) && wrapY)) {
                 int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
                 system_state->vram[vramIndex] = colorbus;
-                system_state->vram_rgb15[vramIndex] = Palette::rgb15_lut[colorbus + palette_select];
-#ifndef NDS_BUILD
+#ifdef NDS_BUILD
+                put_pixel16(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColorRGB15(colorbus));
+#else
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
 #endif
             }

@@ -49,21 +49,6 @@ typedef int SDL_AudioDeviceID;
 #define AUDIO_F32LSB    0x8120
 #define AUDIO_F32MSB    0x9120
 
-// Minimal SDL_PixelFormat stub
-struct SDL_PixelFormat {
-    uint8_t BitsPerPixel;
-    uint8_t BytesPerPixel;
-    uint32_t Rmask, Gmask, Bmask, Amask;
-};
-
-// Minimal SDL_Surface stub — emulator writes 32-bit RGBA pixels into these
-struct SDL_Surface {
-    int w, h;
-    int pitch;
-    void* pixels;
-    SDL_PixelFormat* format;
-};
-
 // SDL_Rect stub
 struct SDL_Rect {
     int x, y, w, h;
@@ -114,45 +99,6 @@ struct SDL_Joystick;
 #define SDLK_F11        0x40000044
 #define SDLK_F12        0x40000045
 
-// SDL_MapRGB replacement — pack into 32-bit ARGB
-static inline Uint32 SDL_MapRGB(SDL_PixelFormat* fmt, uint8_t r, uint8_t g, uint8_t b) {
-    (void)fmt;
-    return (0xFF << 24) | (r << 16) | (g << 8) | b;
-}
-
-// SDL color key stubs
-#define SDL_TRUE 1
-#define SDL_FALSE 0
-static inline void SDL_SetColorKey(SDL_Surface* s, int flag, Uint32 key) {
-    (void)s; (void)flag; (void)key;
-}
-
-// Surface creation/destruction
-static inline SDL_Surface* NDS_CreateSurface(int w, int h) {
-    SDL_Surface* s = (SDL_Surface*)malloc(sizeof(SDL_Surface));
-    s->w = w;
-    s->h = h;
-    s->pitch = w * 4;
-    s->pixels = malloc(w * h * 4);
-    s->format = (SDL_PixelFormat*)malloc(sizeof(SDL_PixelFormat));
-    s->format->BitsPerPixel = 32;
-    s->format->BytesPerPixel = 4;
-    s->format->Rmask = 0x00FF0000;
-    s->format->Gmask = 0x0000FF00;
-    s->format->Bmask = 0x000000FF;
-    s->format->Amask = 0xFF000000;
-    memset(s->pixels, 0, w * h * 4);
-    return s;
-}
-
-static inline void NDS_FreeSurface(SDL_Surface* s) {
-    if (s) {
-        free(s->pixels);
-        free(s->format);
-        free(s);
-    }
-}
-
 // File existence check (replaces std::filesystem::exists)
 static inline bool file_exists(const char* path) {
     struct stat st;
@@ -162,13 +108,5 @@ static inline bool file_exists(const char* path) {
 // DS-specific screen constants
 #define NDS_SCREEN_WIDTH  256
 #define NDS_SCREEN_HEIGHT 192
-
-// Convert 32-bit ARGB pixel to DS 15-bit RGB15
-static inline uint16_t argb_to_rgb15(uint32_t argb) {
-    uint8_t r = (argb >> 16) & 0xFF;
-    uint8_t g = (argb >> 8) & 0xFF;
-    uint8_t b = argb & 0xFF;
-    return RGB15(r >> 3, g >> 3, b >> 3) | BIT(15);
-}
 
 #endif // NDS_BUILD

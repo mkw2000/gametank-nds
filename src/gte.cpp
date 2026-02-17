@@ -286,10 +286,8 @@ std::vector<BaseWindow*> toolWindows;
 SDL_Renderer* mainRenderer = NULL;
 SDL_Texture* framebufferTexture = NULL;
 #else
-// NDS build — use stub surfaces, no windows/renderers
-SDL_Surface* gRAM_Surface = NULL;
-SDL_Surface* vRAM_Surface = NULL;
-Uint32 rmask, gmask, bmask, amask;
+// NDS build — direct RGB555 VRAM buffer for the emulator frame pages.
+uint16_t* vRAM_Surface = NULL;
 #endif
 
 bool isFullScreen = false;
@@ -329,29 +327,44 @@ void VDMA_Write(uint16_t address, uint8_t value) {
 	} else {
 		uint8_t* bufPtr;
 		uint32_t offset = 0;
+#ifndef NDS_BUILD
 		SDL_Surface* targetSurface = NULL;
 		uint32_t yShift = 0;
+#endif
 		if(system_state.dma_control & DMA_CPU_TO_VRAM) {
 			bufPtr = system_state.vram;
+#ifndef NDS_BUILD
 			targetSurface = vRAM_Surface;
+#endif
 			if(system_state.banking & BANK_VRAM_MASK) {
 				offset = 0x4000;
+#ifndef NDS_BUILD
 				yShift = GT_HEIGHT;
+#endif
 			}
 		} else {
 			bufPtr = system_state.gram;
+#ifndef NDS_BUILD
 			targetSurface = gRAM_Surface;
 			yShift = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) * GT_HEIGHT;
+#endif
 			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
 		}
-		bufPtr[(address & 0x3FFF) | offset] = value;
+		uint32_t writeIndex = (address & 0x3FFF) | offset;
+		bufPtr[writeIndex] = value;
 
+#ifdef NDS_BUILD
+		if((system_state.dma_control & DMA_CPU_TO_VRAM) && vRAM_Surface) {
+			vRAM_Surface[writeIndex] = Palette::ConvertColorRGB15(value);
+		}
+#else
 		if(targetSurface) {
 			uint8_t x, y;
 			x = address & 127;
 			y = (address >> 7) & 127;
 			put_pixel32(targetSurface, x, y + yShift, Palette::ConvertColor(targetSurface, value));
 		}
+#endif
 	}
 }
 
@@ -589,6 +602,7 @@ void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 				}
 				system_state.dma_control = value;
 				system_state.dma_control_irq = (system_state.dma_control & DMA_COPY_IRQ_BIT) != 0;
+#ifndef NDS_BUILD
 				if(gRAM_Surface) {
 					if(system_state.dma_control & DMA_TRANSPARENCY_BIT) {
 						SDL_SetColorKey(gRAM_Surface, SDL_TRUE, SDL_MapRGB(gRAM_Surface->format, 0, 0, 0));
@@ -596,6 +610,7 @@ void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 						SDL_SetColorKey(gRAM_Surface, SDL_FALSE, 0);
 					}
 				}
+#endif
 			} else if((address & 0x000F) == 0x0005) {
 				blitter->CatchUp();
 				system_state.banking = value;
@@ -625,14 +640,22 @@ bool rshift = false;
 void randomize_vram() {
 	for(int i = 0; i < VRAM_BUFFER_SIZE; i ++) {
 		system_state.vram[i] = rand() % 256;
+#ifdef NDS_BUILD
+		if(vRAM_Surface) {
+			vRAM_Surface[i] = Palette::ConvertColorRGB15(system_state.vram[i]);
+		}
+#else
 		put_pixel32(vRAM_Surface, i & 127, i >> 7, Palette::ConvertColor(vRAM_Surface, system_state.vram[i]));
+#endif
 	}
+#ifndef NDS_BUILD
 	for(int i = 0; i < GRAM_BUFFER_SIZE; i ++) {
 		system_state.gram[i] = rand() % 256;
 		if (gRAM_Surface) {
 			put_pixel32(gRAM_Surface, i & 127, i >> 7, Palette::ConvertColor(gRAM_Surface, system_state.gram[i]));
 		}
 	}
+#endif
 }
 
 void randomize_memory() {
@@ -1382,7 +1405,7 @@ void refreshScreen() {
 #ifdef NDS_BUILD
 	// Use pre-converted RGB15 buffer written by blitter, copy via DMA
 	int srcPage = (system_state.dma_control & DMA_VID_OUT_PAGE_BIT) ? 1 : 0;
-	uint16_t* srcBuffer = system_state.vram_rgb15 + (srcPage * 128 * 128);
+	uint16_t* srcBuffer = vRAM_Surface + (srcPage * 128 * 128);
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
 
 	// Center 128x128 on 256x192
@@ -1914,7 +1937,6 @@ int main(int argC, char* argV[]) {
 #ifdef NDS_BUILD
 	// NDS: initialize hardware
 	defaultExceptionHandler();
-	Palette::InitRGB15LUT();
 
 	// Set up top screen for bitmap output (main engine)
 	videoSetMode(MODE_5_2D);
@@ -1990,8 +2012,7 @@ int main(int argC, char* argV[]) {
 	cartridge_state.write_mode = false;
 
 #ifdef NDS_BUILD
-	vRAM_Surface = NDS_CreateSurface(GT_WIDTH, GT_HEIGHT * 2);
-	gRAM_Surface = NULL; // gRAM too big for NDS (2MB)
+	vRAM_Surface = system_state.vram_rgb15;
 #else
 	SDL_Init(SDL_INIT_VIDEO);
 	atexit(SDL_Quit);

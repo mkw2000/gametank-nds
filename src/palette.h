@@ -1,5 +1,6 @@
 #pragma once
 #include "SDL_inc.h"
+#include "gametank_palette.h"
 
 #define PALETTE_SELECT_OLD 0
 #define PALETTE_SELECT_CAPTURE 256
@@ -14,10 +15,10 @@ typedef struct RGB_Color {
 
 class Palette {
 public:
+#ifndef NDS_BUILD
     static Uint32 ConvertColor(SDL_Surface* target, uint8_t index);
-#ifdef NDS_BUILD
-    static uint16_t ConvertColorRGB15(uint8_t index);
-    static uint16_t rgb15_lut[1024];
-    static void InitRGB15LUT();
 #endif
+    static inline uint16_t ConvertColorRGB15(uint8_t index) {
+        return gt_palette_rgb555[index + palette_select];
+    }
 };

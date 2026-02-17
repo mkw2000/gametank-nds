@@ -16,15 +16,18 @@
 #define DMA_COPY_IRQ_BIT 64
 #define DMA_TRANSPARENCY_BIT 128
 
-Uint32 get_pixel32( SDL_Surface *surface, int x, int y );
-void put_pixel32( SDL_Surface *surface, int x, int y, Uint32 pixel );
+#ifdef NDS_BUILD
+using VRAMSurface = uint16_t*;
+#else
+using VRAMSurface = SDL_Surface*;
+#endif
 
 class Blitter {
 private:
     mos6502*& cpu_core;
     Timekeeper* timekeeper;
     SystemState* system_state;
-    SDL_Surface*& vram_surface;
+    VRAMSurface& vram_surface;
 
     uint8_t counterVX;
     uint8_t counterVY;
@@ -60,7 +63,7 @@ public:
     // Frame skip optimization: when true, blitter computes but doesn't write to VRAM/surface
     bool suppress_output = false;
 
-    Blitter(mos6502*& cpu_core, Timekeeper* timekeeper, SystemState* system_state, SDL_Surface*& vram_surface) : cpu_core(cpu_core), timekeeper(timekeeper), system_state(system_state), vram_surface(vram_surface) {};
+    Blitter(mos6502*& cpu_core, Timekeeper* timekeeper, SystemState* system_state, VRAMSurface& vram_surface) : cpu_core(cpu_core), timekeeper(timekeeper), system_state(system_state), vram_surface(vram_surface) {};
 
     void SetParam(uint8_t address, uint8_t value);
     void CatchUp(uint64_t cycles=0);

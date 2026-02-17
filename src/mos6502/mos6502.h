@@ -42,22 +42,6 @@ using namespace std;
 class mos6502
 {
 private:
-	
-
-	typedef void (mos6502::*CodeExec)(uint16_t);
-	typedef uint16_t (mos6502::*AddrExec)();
-
-	struct Instr
-	{
-		AddrExec addr;
-		CodeExec code;
-		uint8_t cycles;
-	};
-
-	Instr InstrTable[256];
-
-	void Exec(Instr i);
-
 	// Helper function for determining if two addresses are in the same page
 	inline bool addressesSamePage(uint16_t a, uint16_t b);
 
