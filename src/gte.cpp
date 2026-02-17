@@ -1208,6 +1208,7 @@ static void NDSPerfMaybePrint() {
 	uint8_t topOps[3] = {0, 0, 0};
 	uint64_t topOpCycles[3] = {0, 0, 0};
 	uint32_t topOpExec[3] = {0, 0, 0};
+	uint64_t opcodeDeltaTotal = 0;
 
 	if (cpu_core) {
 		uint32_t execNow[256];
@@ -1219,6 +1220,7 @@ static void NDSPerfMaybePrint() {
 			ndsLastOpcodeCycles[i] = cyclesNow[i];
 			ndsLastOpcodeExec[i] = execNow[i];
 			if (deltaCycles == 0) continue;
+			opcodeDeltaTotal += deltaCycles;
 
 			if (deltaCycles > topOpCycles[0]) {
 				topOpCycles[2] = topOpCycles[1]; topOps[2] = topOps[1]; topOpExec[2] = topOpExec[1];
@@ -1245,10 +1247,10 @@ static void NDSPerfMaybePrint() {
 		(unsigned long)renderPct,
 		(unsigned long)audioPct,
 		(unsigned long)inputPct);
-	if (cpuDelta > 0 && topOpCycles[0] > 0) {
-		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / cpuDelta);
-		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / cpuDelta);
-		const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / cpuDelta);
+	if (opcodeDeltaTotal > 0 && topOpCycles[0] > 0) {
+		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / opcodeDeltaTotal);
+		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / opcodeDeltaTotal);
+		const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / opcodeDeltaTotal);
 		printf("OP:%02X/%2lu %02X/%2lu %02X/%2lu    \n",
 			(unsigned int)topOps[0], (unsigned long)p0,
 			(unsigned int)topOps[1], (unsigned long)p1,

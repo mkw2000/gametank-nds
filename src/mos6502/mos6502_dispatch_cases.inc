@@ -27,7 +27,6 @@ case 0X80: { src = Addr_REL(); Op_BRA(src); elapsedCycles = 3; break; }
 case 0X2C: { src = Addr_ABS(); Op_BIT(src); elapsedCycles = 4; break; }
 case 0X24: { src = Addr_ZER(); Op_BIT(src); elapsedCycles = 3; break; }
 case 0X30: { src = Addr_REL(); Op_BMI(src); elapsedCycles = 2; break; }
-case 0XD0: { src = Addr_REL(); Op_BNE(src); elapsedCycles = 2; break; }
 case 0X10: { src = Addr_REL(); Op_BPL(src); elapsedCycles = 2; break; }
 case 0X00: { src = Addr_IMP(); Op_BRK(src); elapsedCycles = 7; break; }
 case 0X50: { src = Addr_REL(); Op_BVC(src); elapsedCycles = 2; break; }
@@ -77,7 +76,6 @@ case 0XE8: { src = Addr_IMP(); Op_INX(src); elapsedCycles = 2; break; }
 case 0XC8: { src = Addr_IMP(); Op_INY(src); elapsedCycles = 2; break; }
 case 0X4C: { src = Addr_ABS(); Op_JMP(src); elapsedCycles = 3; break; }
 case 0X6C: { src = Addr_ABI(); Op_JMP(src); elapsedCycles = 5; break; }
-case 0X20: { src = Addr_ABS(); Op_JSR(src); elapsedCycles = 6; break; }
 case 0XA1: { src = Addr_INX(); Op_LDA(src); elapsedCycles = 6; break; }
 case 0XB1: { src = Addr_INY(); Op_LDA(src); elapsedCycles = 5; break; }
 case 0XB5: { src = Addr_ZEX(); Op_LDA(src); elapsedCycles = 4; break; }

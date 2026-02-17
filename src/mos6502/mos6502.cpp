@@ -1514,6 +1514,29 @@ void mos6502::Run(
 				elapsedCycles = 2;
 				break;
 			}
+			case 0xD0: { // BNE REL
+				uint16_t off = (uint16_t)ReadBus(pc++);
+				if (off & 0x80) off |= 0xFF00;
+				const uint16_t target = pc + (int16_t)off;
+				if (!IF_ZERO()) {
+					if (!addressesSamePage(pc, target)) opExtraCycles++;
+					pc = target;
+					opExtraCycles++;
+				}
+				elapsedCycles = 2;
+				break;
+			}
+			case 0x20: { // JSR ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				const uint16_t target = (uint16_t)(lo | (hi << 8));
+				pc--;
+				StackPush((pc >> 8) & 0xFF);
+				StackPush(pc & 0xFF);
+				pc = target;
+				elapsedCycles = 6;
+				break;
+			}
 			case 0x28: { // PLP
 				status = StackPop();
 				status |= CONSTANT;
