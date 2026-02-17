@@ -1380,26 +1380,20 @@ static void ndsMenuHandleInput() {
 
 void refreshScreen() {
 #ifdef NDS_BUILD
-	if (!vRAM_Surface) return;
-
-	// Copy the active framebuffer page from the emulator's vRAM surface
-	// to the DS top screen VRAM, converting 32-bit ARGB -> 15-bit RGB15.
-	int srcY = (system_state.dma_control & DMA_VID_OUT_PAGE_BIT) ? GT_HEIGHT : 0;
-	uint32_t* srcPixels = (uint32_t*)vRAM_Surface->pixels;
+	// Use pre-converted RGB15 buffer written by blitter, copy via DMA
+	int srcPage = (system_state.dma_control & DMA_VID_OUT_PAGE_BIT) ? 1 : 0;
+	uint16_t* srcBuffer = system_state.vram_rgb15 + (srcPage * 128 * 128);
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
 
 	// Center 128x128 on 256x192
-	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;
-	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2;
+	int xOff = (NDS_SCREEN_WIDTH - GT_WIDTH) / 2;  // 64
+	int yOff = (NDS_SCREEN_HEIGHT - GT_HEIGHT) / 2;  // 32
 
-	int srcW = vRAM_Surface->w;
+	// Copy each row via DMA - much faster than pixel-by-pixel
 	for (int y = 0; y < GT_HEIGHT; y++) {
-		uint32_t* srcRow = srcPixels + (srcY + y) * srcW;
-		uint16_t* dstRow = dsVram + (yOff + y) * NDS_SCREEN_WIDTH + xOff;
-		for (int x = 0; x < GT_WIDTH; x += 2) {
-			dstRow[x]     = argb_to_rgb15(srcRow[x]);
-			dstRow[x + 1] = argb_to_rgb15(srcRow[x + 1]);
-		}
+		uint16_t* srcRow = srcBuffer + (y * GT_WIDTH);
+		uint16_t* dstRow = dsVram + ((yOff + y) * NDS_SCREEN_WIDTH) + xOff;
+		dmaCopy(srcRow, dstRow, GT_WIDTH * sizeof(uint16_t));
 	}
 #else
 	SDL_Rect src, dest;
@@ -2064,8 +2058,6 @@ int main(int argC, char* argV[]) {
 	while(running) {
 		for (int f = 0; f < ndsFrameSkip && running; f++) {
 			ndsFrameCounter = f;
-			// Suppress blitter VRAM writes on skipped frames (still emulates, just doesn't draw)
-			blitter->suppress_output = (f != ndsFrameSkip - 1);
 			mainloop(0, NULL);
 		}
 		swiWaitForVBlank();

@@ -15,4 +15,7 @@ typedef struct RGB_Color {
 class Palette {
 public:
     static Uint32 ConvertColor(SDL_Surface* target, uint8_t index);
+#ifdef NDS_BUILD
+    static uint16_t ConvertColorRGB15(uint8_t index);
+#endif
 };

@@ -8,6 +8,9 @@ const int FRAME_BUFFER_SIZE = 16384;
 #define VRAM_BUFFER_SIZE (FRAME_BUFFER_SIZE*2)
 #define GRAM_BUFFER_SIZE (FRAME_BUFFER_SIZE*32)
 
+// NDS: Pre-converted RGB15 buffer for DMA transfer (128x128 * 2 pages)
+#define VRAM_RGB15_SIZE (128 * 128 * 2)
+
 #define BANK_GRAM_MASK  0b00000111
 #define BANK_VRAM_MASK  0b00001000
 #define BANK_WRAPX_MASK 0b00010000
@@ -31,6 +34,7 @@ struct SystemState {
     bool ram_initialized[RAMSIZE];
 
     uint8_t vram[VRAM_BUFFER_SIZE];
+    uint16_t vram_rgb15[VRAM_RGB15_SIZE];  // NDS: Pre-converted for DMA
     uint8_t gram[GRAM_BUFFER_SIZE];
     
     uint8_t VIA_regs[16];

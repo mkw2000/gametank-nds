@@ -1,5 +1,8 @@
 #include "palette.h"
 #include "gametank_palette.h"
+#ifdef NDS_BUILD
+#include "nds_platform.h"
+#endif
 
 //Offset into palette multi table
 // 0 - old inaccurate table
@@ -15,3 +18,10 @@ Uint32 Palette::ConvertColor(SDL_Surface* target, uint8_t index) {
 		return SDL_MapRGB(target->format, 1, 1, 1);
 	return res;
 }
+
+#ifdef NDS_BUILD
+uint16_t Palette::ConvertColorRGB15(uint8_t index) {
+	RGB_Color c = ((RGB_Color*)gt_palette_vals)[index + palette_select];
+	return RGB15(c.r >> 3, c.g >> 3, c.b >> 3) | BIT(15);
+}
+#endif

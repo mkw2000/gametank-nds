@@ -107,15 +107,15 @@ void Blitter::ProcessCycle() {
         }
 
         if(system_state->dma_control & DMA_COPY_ENABLE_BIT) {
-            if(!suppress_output) {
-                if(((system_state->dma_control & DMA_TRANSPARENCY_BIT) || (colorbus != 0))
-                    && !((counterVX & 0x80) && (system_state->banking & BANK_WRAPX_MASK))
-                    && !((counterVY & 0x80) && system_state->banking & BANK_WRAPY_MASK)) {
-                    int yShift = (system_state->banking & BANK_VRAM_MASK) ? 128 : 0;
-                    int vOffset = yShift << 7;
-                    system_state->vram[((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset] = colorbus;
-                    put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
-                }
+            if(((system_state->dma_control & DMA_TRANSPARENCY_BIT) || (colorbus != 0))
+                && !((counterVX & 0x80) && (system_state->banking & BANK_WRAPX_MASK))
+                && !((counterVY & 0x80) && system_state->banking & BANK_WRAPY_MASK)) {
+                int yShift = (system_state->banking & BANK_VRAM_MASK) ? 128 : 0;
+                int vOffset = yShift << 7;
+                int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
+                system_state->vram[vramIndex] = colorbus;
+                system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
+                put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
             }
             ++pixels_this_frame;
         }
@@ -176,7 +176,9 @@ void Blitter::ProcessBatch(uint64_t cycles) {
             if((transparency || colorbus != 0)
                 && !((counterVX & 0x80) && wrapX)
                 && !((counterVY & 0x80) && wrapY)) {
-                system_state->vram[((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset] = colorbus;
+                int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
+                system_state->vram[vramIndex] = colorbus;
+                system_state->vram_rgb15[vramIndex] = Palette::ConvertColorRGB15(colorbus);
                 put_pixel32(vram_surface, counterVX & 0x7F, (counterVY & 0x7F) + yShift, Palette::ConvertColor(vram_surface, colorbus));
             }
             ++pixels_this_frame;
