@@ -442,7 +442,7 @@ uint8_t MemoryRead(uint16_t address) {
 }
 
 // Fast path for the main CPU: zero page reads bypass MemoryReadResolve entirely
-inline uint8_t MemoryReadFast(uint16_t address) {
+__attribute__((always_inline)) inline uint8_t MemoryReadFast(uint16_t address) {
 	if(address < 0x100) {
 		return system_state.ram[FULL_RAM_ADDRESS(address)];
 	}

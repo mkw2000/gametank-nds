@@ -24,13 +24,13 @@ void AudioCoprocessor::register_write(uint16_t address, uint8_t value) {
 		case ACP_NMI:
 #ifdef NDS_BUILD
             state.cpu->NMI();
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #else
             SDL_LockAudioDevice(state.device);
             state.cpu->NMI();
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #ifdef WRAPPER_MODE
-            state.cpu->Run(state.cycles_per_sample, state.cycle_counter);
+            state.cpu->RunOptimized(state.cycles_per_sample, state.cycle_counter);
 #endif
             SDL_UnlockAudioDevice(state.device);
 #endif
@@ -79,7 +79,7 @@ void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
             if(state->running) {
                 state->cpu->IRQ();
                 state->cpu->ClearIRQ();
-                state->cpu->Run(state->cycles_per_sample, state->cycle_counter);
+                state->cpu->RunOptimized(state->cycles_per_sample, state->cycle_counter);
             }
         }
     }
@@ -87,11 +87,11 @@ void AudioCoprocessor::fill_audio(void *udata, uint8_t *stream, int len) {
 
 ACPState* AudioCoprocessor::singleton_acp_state;
 
-uint8_t ACP_MemoryRead(uint16_t address) {
+__attribute__((always_inline)) inline uint8_t ACP_MemoryRead(uint16_t address) {
     return AudioCoprocessor::singleton_acp_state->ram[address & 0xFFF];
 }
 
-uint8_t ACP_CPUSync(uint16_t address) {
+__attribute__((always_inline)) inline uint8_t ACP_CPUSync(uint16_t address) {
     uint8_t opcode = ACP_MemoryRead(address);
     if(opcode == 0x40) {
         //If opcode is ReTurn from Interrupt
@@ -100,7 +100,7 @@ uint8_t ACP_CPUSync(uint16_t address) {
     return opcode;
 }
 
-void ACP_MemoryWrite(uint16_t address, uint8_t value) {
+__attribute__((always_inline)) inline void ACP_MemoryWrite(uint16_t address, uint8_t value) {
     AudioCoprocessor::singleton_acp_state->ram[address & 0xFFF] = value;
     if(address & 0x8000) {
         AudioCoprocessor::singleton_acp_state->dacReg = value;
