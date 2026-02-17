@@ -1626,7 +1626,7 @@ EM_BOOL mainloop(double time, void* userdata) {
 #endif
 			}
 
-#if !defined(WASM_BUILD) && !defined(NDS_BUILD)
+#if !defined(NDS_BUILD) && !defined(WASM_BUILD)
 			if(!gofast) {
 				SDL_Delay(timekeeper.time_scaling * intended_cycles/timekeeper.system_clock);
 			} else {

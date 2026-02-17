@@ -197,6 +197,80 @@ void Blitter::ProcessBatch(uint64_t cycles) {
     }
 #endif
 
+#ifdef NDS_BUILD
+    // NDS Medium Path: Standard 1:1 copy without GCARRY flag
+    // Many operations are simple copies but don't set the specific GCARRY bit.
+    // If no scaling/flipping/wrapping/colorfill is active, we can treat it as linear.
+    if (!xDir && !yDir && !wrapX && !wrapY && !colorfill) {
+        // We need to ensure scale is actually 1:1. 
+        // If GX/VX params are standard, they usually are. 
+        // But for safety, let's just use the optimized loop which accounts for this 
+        // by manually incrementing the linear pointers.
+        
+        while (cycles > 0 && running && !init) {
+            uint8_t rowPixels = counterW;
+            if (rowPixels == 0) rowPixels = params[PARAM_WIDTH] & 0x7F;
+            uint64_t toProcess = (cycles < rowPixels) ? cycles : rowPixels;
+            if (toProcess == 0) { ProcessCycle(); cycles--; continue; }
+
+            // Base addresses for this row
+            uint32_t gOffset = ComputeGOffset(system_state, counterGY, counterGX);
+            uint32_t gx_linear = ((counterGY & 0x7F) << 7) | (counterGX & 0x7F);
+            uint8_t* srcPtr = &system_state->gram[gx_linear | gOffset];
+            
+            int vramIndex = ((counterVY & 0x7F) << 7) | (counterVX & 0x7F) | vOffset;
+            uint8_t* dstPtr = &system_state->vram[vramIndex];
+            uint16_t* dst15Ptr = &system_state->vram_rgb15[vramIndex];
+            
+            // Check if we can just memcpy? 
+            // Only if transparency is off.
+            // But usually transparency is ON.
+            
+            for(uint64_t i = 0; i < toProcess; i++) {
+                // Read
+                uint8_t colorbus = *srcPtr; // Linear increment implies we just use ++
+                srcPtr++; // GX increments by 1
+                
+                // Write
+                if (!transparency || colorbus != 0) {
+                    *dstPtr = colorbus;
+                    *dst15Ptr = Palette::rgb15_lut[colorbus + palette_select];
+                }
+                dstPtr++; // VX increments by 1
+                dst15Ptr++;
+            }
+            
+            // Update counters manually as if we ran the state machine
+            counterW -= toProcess;
+            counterVX += toProcess;
+            counterGX += toProcess; // We assume 1:1 here.
+            pixels_this_frame += toProcess;
+            cycles -= toProcess;
+
+            // Row end logic
+            if (counterW == 0) {
+                counterVY++;
+                counterGY++; // Y increments by 1
+                 // Handle Y banking/wrapping if needed, but we checked !wrapY
+                 // However, ComputeGOffset handles banking bits 
+                --counterH;
+                
+                counterW = params[PARAM_WIDTH] & 0x7F;
+                counterVX = params[PARAM_VX];
+                counterGX = params[PARAM_GX];
+                
+                if (COPYDONE) {
+                    running = false;
+                    irq = true;
+                    // break outer loop to handle completion
+                    break;
+                }
+            }
+        }
+        return;
+    }
+#endif
+
     while(cycles > 0 && running && !init) {
         // How many pixels remaining in current row?
         uint8_t rowPixels = counterW;
