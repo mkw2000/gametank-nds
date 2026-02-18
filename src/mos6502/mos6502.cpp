@@ -36,7 +36,7 @@ extern "C" void GT_AudioRamWrite(uint16_t address, uint8_t value);
 extern "C" uint8_t GT_JoystickReadFast(uint8_t portNum);
 
 #ifndef NDS_OPCODE_PROFILE_STRIDE
-#define NDS_OPCODE_PROFILE_STRIDE 17u
+#define NDS_OPCODE_PROFILE_STRIDE 33u
 #endif
 
 static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
@@ -86,6 +86,7 @@ struct NDSRomDecodeEntry {
 	uint16_t abs;
 	uint8_t abs_read_mode;
 	int16_t rel;
+	const uint8_t* abs_ptr;
 };
 
 static NDSRomDecodeEntry g_nds_rom_decode[0x8000];
@@ -134,6 +135,23 @@ static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 		entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
 		entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
 		entry.rel = (int16_t)(int8_t)entry.op1;
+		switch (entry.abs_read_mode) {
+			case NDS_ABS_READ_ROM_LO:
+				entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+				break;
+			case NDS_ABS_READ_ROM_HI:
+				entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+				break;
+			case NDS_ABS_READ_ROM_LINEAR:
+				entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+				break;
+			case NDS_ABS_READ_VIA:
+				entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+				break;
+			default:
+				entry.abs_ptr = nullptr;
+				break;
+		}
 	}
 	return entry;
 }
@@ -1763,11 +1781,13 @@ td_op_slow:
 				case 0xAD: { // LDA ABS
 					uint16_t addr;
 					uint8_t absReadMode = NDS_ABS_READ_FALLBACK;
+					const uint8_t* absPtr = nullptr;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						addr = dec.abs;
 						absReadMode = dec.abs_read_mode;
+						absPtr = dec.abs_ptr;
 						pc = (uint16_t)(pc + 2);
 					} else {
 						const uint16_t lo = FetchByte();
@@ -1776,34 +1796,26 @@ td_op_slow:
 					}
 					uint8_t m = 0;
 					if (LIKELY(Sync == NULL)) {
-						switch (absReadMode) {
-							case NDS_ABS_READ_RAM:
-								m = cached_ram_ptr[addr];
-								break;
-							case NDS_ABS_READ_ROM_LO:
-								m = cached_rom_lo_ptr[addr & 0x3FFF];
-								break;
-							case NDS_ABS_READ_ROM_HI:
-								m = cached_rom_hi_ptr[addr & 0x3FFF];
-								break;
-							case NDS_ABS_READ_ROM_LINEAR:
-								m = cached_rom_lo_ptr[addr & cached_rom_linear_mask];
-								break;
-							case NDS_ABS_READ_AUDIO:
-								m = GT_AudioRamRead(addr);
-								break;
-							case NDS_ABS_READ_VIA:
-								m = system_state.VIA_regs[addr & 0xF];
-								break;
-							case NDS_ABS_READ_JOY:
-								m = GT_JoystickReadFast((uint8_t)addr);
-								break;
-							case NDS_ABS_READ_OPEN_BUS:
-								m = open_bus();
-								break;
-							default:
-								m = ReadBus(addr);
-								break;
+						if (LIKELY(absPtr != nullptr)) {
+							m = *absPtr;
+						} else {
+							switch (absReadMode) {
+								case NDS_ABS_READ_RAM:
+									m = cached_ram_ptr[addr];
+									break;
+								case NDS_ABS_READ_AUDIO:
+									m = GT_AudioRamRead(addr);
+									break;
+								case NDS_ABS_READ_JOY:
+									m = GT_JoystickReadFast((uint8_t)addr);
+									break;
+								case NDS_ABS_READ_OPEN_BUS:
+									m = open_bus();
+									break;
+								default:
+									m = ReadBus(addr);
+									break;
+							}
 						}
 					} else {
 						m = ReadBus(addr);
