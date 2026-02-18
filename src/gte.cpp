@@ -1237,7 +1237,7 @@ struct NDSPerfStats {
 static NDSPerfStats ndsPerf;
 static uint32_t ndsLastOpcodeExec[256] = {0};
 static uint64_t ndsLastOpcodeCycles[256] = {0};
-#define NDS_PERF_PRINT_INTERVAL_FRAMES 180
+#define NDS_PERF_PRINT_INTERVAL_FRAMES 90
 #define NDS_PERF_LOG_PATH_PRIMARY "fat:/gametank_perf.log"
 #define NDS_PERF_LOG_PATH_FALLBACK "sd:/gametank_perf.log"
 
