@@ -16,7 +16,7 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
-#define NDS_USE_THREADED_DISPATCH 1
+#define NDS_USE_THREADED_DISPATCH 0
 
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
