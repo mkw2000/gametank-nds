@@ -16,11 +16,7 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
-#if defined(NDS_BUILD) && defined(ARM9) && defined(__GNUC__)
-#define NDS_USE_THREADED_DISPATCH 1
-#else
 #define NDS_USE_THREADED_DISPATCH 0
-#endif
 
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
@@ -1695,6 +1691,17 @@ td_op_slow:
 				const uint16_t hi = StackPop();
 				pc = (uint16_t)((hi << 8) | lo);
 				pc++;
+				elapsedCycles = 6;
+				break;
+			}
+			case 0xEE: { // INC ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				const uint16_t addr = (uint16_t)(lo | (hi << 8));
+				uint8_t m = ReadBus(addr);
+				m = (uint8_t)(m + 1);
+				SetNZFast(m);
+				WriteBus(addr, m);
 				elapsedCycles = 6;
 				break;
 			}
