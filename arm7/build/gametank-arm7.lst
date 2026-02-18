@@ -7,14 +7,14 @@
 0238036c 00000244 T crt0Startup
 023805b0 0000004c T crt0CopyMem32
 023805fc 00000058 T crt0FillMem32
-02380658 0000000c t __memcpy_from_thumb
-02380664 00000008 t __build_argv_from_thumb
-0238066c 00000010 t ___pxiInit_veneer
-0238067c 00000010 t ___threadInit_veneer
+02380658 00000008 t __build_argv_from_thumb
+02380660 00000010 t ___threadInit_veneer
+02380670 0000000c t __memcpy_from_thumb
+0238067c 00000010 t ___pxiInit_veneer
 02380690 a __loadlist_lma
 02380690 a __main_lma
-0239440c a __loadlist_start
-02394424 a __loadlist_end
+02393f0c a __loadlist_start
+02393f24 a __loadlist_end
 02e80000 a __twl_lma
 02e80000 a __twl_loadlist_lma
 02e87418 a __twl_loadlist_start
@@ -54,23 +54,23 @@
 02fcd8a8 000000d8 T _mwlMgmtMakeAssocReq
 02fcd980 00000064 T _mwlMgmtMakeDeauth
 02fcd9e4 T _fini
-02fcda00 0000000c t ____syscall_exit_from_arm
-02fcda0c 00000010 t __threadSleepTicks_veneer
-02fcda1c 00000010 t ___mwlBbpWrite_veneer
-02fcda2c 00000010 t __svcGetCRC16_veneer
-02fcda3c 00000010 t ___mwlBbpRead_veneer
-02fcda4c 0000000c t __memset_from_thumb
+02fcda00 00000010 t __threadSleepTicks_veneer
+02fcda10 00000010 t ___mwlBbpWrite_veneer
+02fcda20 0000000c t ____syscall_exit_from_arm
+02fcda2c 00000010 t ___mwlBbpRead_veneer
+02fcda3c 00000010 t ___mwlRfCmd_veneer
+02fcda4c 0000000c t __memcpy_from_thumb
 02fcda58 00000010 t __netbufAlloc_veneer
-02fcda68 00000010 t ___mwlRfCmd_veneer
-02fcda78 0000000c t __memcpy_from_thumb
+02fcda68 0000000c t __memset_from_thumb
+02fcda74 00000010 t __svcGetCRC16_veneer
 02fcda84 00000010 t __pmReadNvram_veneer
 02fcdaa0 00000064 t s_mwlMacInitRegs
 02fcdb04 00000020 t s_mwlRfMacRegs
 02fcdb28 00000140 D _impure_data
 02fcdd6c r __exidx_start
 02fcdf6c r __EH_FRAME_BEGIN__
-02fcdf6c r __FRAME_END__
 02fcdf6c r __exidx_end
+02fcdf6c r __FRAME_END__
 02fcdf70 d __frame_dummy_init_array_entry
 02fcdf70 d __init_array_start
 02fcdf70 d __preinit_array_end
@@ -237,30 +237,30 @@
 037c664c 00000044 T ar6kWmiSetBitRate
 037c6690 00000048 T ar6kWmixConfigDebugModuleCmd
 037c66d8 000000a8 T ar6kWmiStartup
-037c6780 0000000c t __netbufAlloc_from_arm
-037c678c 00000008 t ____aeabi_uidiv_from_thumb
-037c6794 0000000c t __threadSleepTicks_from_arm
-037c67a0 0000000c t __threadJoin_from_arm
-037c67ac 0000000c t __svcSha1UpdateTWL_from_arm
-037c67b8 0000000c t __netbufFree_from_arm
-037c67c4 0000000c t __svcSha1CalcTWL_from_arm
-037c67d0 0000000c t __tickGetCount_from_arm
-037c67dc 0000000c t __i2cReadRegister8_from_arm
-037c67e8 0000000c t __wlanFindOrAddBss_from_arm
-037c67f4 0000000c t __svcSha1InitTWL_from_arm
-037c6800 0000000c t __i2cWriteRegister8_from_arm
-037c680c 0000000c t __mailboxRecv_from_arm
-037c6818 0000000c t __mailboxTrySend_from_arm
-037c6824 0000000c t __svcSha1DigestTWL_from_arm
-037c6830 0000000c t __wlanFindRsnOrWpaIe_from_arm
-037c683c 0000000c t __gpioSetWlModule_from_arm
-037c6848 0000000c t __mutexLock_from_arm
-037c6854 0000000c t __threadStart_from_arm
-037c6860 0000000c t __irqSet2_from_arm
-037c686c 0000000c t __mutexUnlock_from_arm
-037c6878 0000000c t __wlanParseBeacon_from_arm
-037c6884 0000000c t __threadPrepare_from_arm
-037c6890 0000000c t ___netbufRx_from_arm
+037c6780 0000000c t ___netbufRx_from_arm
+037c678c 0000000c t __mutexLock_from_arm
+037c6798 0000000c t __threadStart_from_arm
+037c67a4 0000000c t __svcSha1DigestTWL_from_arm
+037c67b0 0000000c t __i2cWriteRegister8_from_arm
+037c67bc 0000000c t __irqSet2_from_arm
+037c67c8 0000000c t __threadSleepTicks_from_arm
+037c67d4 0000000c t __wlanParseBeacon_from_arm
+037c67e0 0000000c t __threadPrepare_from_arm
+037c67ec 0000000c t __i2cReadRegister8_from_arm
+037c67f8 0000000c t __tickGetCount_from_arm
+037c6804 0000000c t __mailboxTrySend_from_arm
+037c6810 0000000c t __gpioSetWlModule_from_arm
+037c681c 0000000c t __wlanFindRsnOrWpaIe_from_arm
+037c6828 0000000c t __netbufAlloc_from_arm
+037c6834 0000000c t __mutexUnlock_from_arm
+037c6840 00000008 t ____aeabi_uidiv_from_thumb
+037c6848 0000000c t __mailboxRecv_from_arm
+037c6854 0000000c t __svcSha1InitTWL_from_arm
+037c6860 0000000c t __wlanFindOrAddBss_from_arm
+037c686c 0000000c t __netbufFree_from_arm
+037c6878 0000000c t __svcSha1CalcTWL_from_arm
+037c6884 0000000c t __threadJoin_from_arm
+037c6890 0000000c t __svcSha1UpdateTWL_from_arm
 037c68f8 00000014 t dummy_scan_params.0
 037c690c 00000004 t cipher.1
 037c6910 00000004 t authtype.2
@@ -308,8 +308,8 @@
 037c9b30 00000008 b s_tmioIrqQueue
 037c9b38 00000008 b s_ar6kCreditWaitList
 037c9b40 b __twl_bss_end
-037f8000 0000002c W __gnu_cxx::__throw_concurrence_lock_error()
 037f8000 t __wram_start
+037f8000 0000002c W __gnu_cxx::__throw_concurrence_lock_error()
 037f802c 0000002c W __gnu_cxx::__throw_concurrence_unlock_error()
 037f8058 0000000c T std::terminate()
 037f8064 0000000c T std::unexpected()
@@ -328,576 +328,694 @@
 037f8570 00000014 t (anonymous namespace)::A7MemoryRead(unsigned short)
 037f8584 00000020 t (anonymous namespace)::A7MemoryWrite(unsigned short, unsigned char)
 037f85a4 00000004 t (anonymous namespace)::A7CPUStopped()
-037f85a8 000003f4 t (anonymous namespace)::AudioThreadMain(void*)
-037f899c 000000e0 T gtAudioOffloadInit
-037f8a7c 0000008c T mos6502::mos6502(unsigned char (*)(unsigned short), void (*)(unsigned short, unsigned char), void (*)(), unsigned char (*)(unsigned short))
-037f8a7c 0000008c T mos6502::mos6502(unsigned char (*)(unsigned short), void (*)(unsigned short, unsigned char), void (*)(), unsigned char (*)(unsigned short))
-037f8b08 00000068 T mos6502::Reset()
-037f8b70 000000e4 T mos6502::IRQ()
-037f8c54 00000010 T mos6502::ClearIRQ()
-037f8c64 000000d4 T mos6502::NMI()
-037f8d38 00000154 T mos6502::Op_ADC(unsigned short)
-037f8e8c 000000e8 T mos6502::Op_SBC(unsigned short)
-037f8f74 00006b30 t mos6502::RunOptimized(long, unsigned long long&) [clone .part.0]
-037ffaa4 00000010 T mos6502::RunOptimized(long, unsigned long long&)
-037ffab4 00000072 T threadExit
-037ffb28 0000001e t _threadTickTask
-037ffb48 00000080 T _threadInit
-037ffbc8 0000006c T threadPrepare
-037ffc34 00000086 T threadStart
-037ffcbc 00000046 T threadJoin
-037ffd04 00000070 T threadIrqWait
-037ffd74 0000004a T threadSleepTicks
-037ffdc0 0000008c t threadReschedule
-037ffe4c 000000c0 T threadBlock
-037fff0c 000000f0 T threadUnblockOneByValue
-037ffffc 000000d4 T threadUnblockAllByValue
-038000d0 000000d8 T threadUnblockAllByMask
-038001a8 0000006c T mailboxTrySend
-03800214 00000054 T mailboxTryRecv
-03800268 00000066 T mailboxRecv
-038002d0 0000004c T armCopyMem32
-0380031c 00000058 T armFillMem32
-03800374 0000002c T armContextSave
-038003a0 00000020 T armContextLoad
-038003a4 T armContextLoadFromSvc
-038003c0 00000008 T armSwapWord
-038003c8 00000014 T armIrqLockByPsr
-038003dc 00000014 T armIrqUnlockByPsr
-038003f0 00000004 T svcWaitByLoop
-038003f4 00000004 T svcHalt
-038003f8 00000004 T svcSleep
-038003fc 00000004 T svcGetCRC16
-03800400 00000006 T svcCustomHalt
-03800406 0000000c t _pxiMailboxHandler
-03800412 00000002 W _pxiRecvUnhandled
-03800414 000000c0 t _pxiRecvIrqHandler
-038004d4 00000054 T _pxiInit
-03800528 00000012 T pxiWaitForPing
-0380053c 00000054 T pxiSetHandler
-03800590 00000014 T pxiSetMailbox
-038005a4 00000020 T pxiWaitRemote
-038005c4 0000003c T pxiSendPacket
-03800600 00000024 t _keypadSendExtToArm9
-03800624 00000038 T keypadStartExtServer
-0380065c 0000002a t _pmCallEventHandlers
-03800688 00000024 T pmPrepareToReset
-038006ac 000000c8 t _pmPxiThreadMain
-03800774 0000001c t _pmResetPxiHandler
-03800790 00000002 W systemErrorExit
-03800794 000000c0 T pmInit
-03800854 0000002c T pmAddEventHandler
-03800880 00000014 T pmShouldReset
-03800894 00000010 T pmIsSleepAllowed
-038008a4 00000038 T pmSetSleepAllowed
-038008dc 00000030 T pmHasResetJumpTarget
-0380090c 000000f2 T __syscall_exit
-03800a00 000000de T pmEnterSleep
-03800ae0 00000088 T pmMainLoop
-03800b68 00000010 t _rtcUpdateTask
-03800b78 000000b4 T rtcReadRegister
-03800c2c 000000b0 T rtcWriteRegister
-03800cdc 00000094 T rtcInit
-03800d70 00000036 T rtcReadDateTime
-03800da8 00000060 T rtcDateTimeToUnix
-03800e08 00000040 T rtcSyncTime
-03800e48 00000030 t _pmicSpiBegin
-03800e78 00000040 T pmicWriteRegister
-03800eb8 00000048 T pmicReadRegister
-03800f00 00000022 T pmicIssueShutdown
-03800f24 00000060 t _envValidateUserSettings
-03800f84 000000a6 t _envLoadUserSettings
-0380102c 00000020 T envReadNvramSettings
-0380104c 00000068 T pmGetBatteryState
-038010b4 00000034 T pmSetPowerLed
-038010e8 00000060 T pmMicSetAmp
-03801148 0000002c T pmReadNvram
-03801174 00000028 T touchStartServer
-0380119c 000000b4 T touchLoadCalibration
-03801250 0000003c T touchInit
-0380128c 0000011c T touchRead
-038013a8 00000088 t _touchSrvThreadMain
-03801430 00000060 T blkInit
-03801490 00000046 T blkDevIsPresent
-038014d8 0000005e T blkDevInit
-03801538 0000007a T blkDevReadSectors
-038015b4 0000007a T blkDevWriteSectors
-03801630 000000a2 t _blkPxiThread
-038016d4 00000024 t _wlmgrOnAssoc
-038016f8 00000018 t _wlmgrScanComplete
-03801710 0000003e t _wlmgrTxProcess
-03801750 00000020 t _wlmgrSetState
-03801770 00000038 t _wlmgrStop
-038017a8 00000038 t _wlmgrTxPxiHandler
-038017e0 0000002c t _wlmgrPmEventHandler
-0380180c 000001cc t _wlmgrPxiProcessCmd.isra.0
-038019d8 0000007c t _wlmgrPxiProcess.constprop.0
-03801a54 000000b4 t _wlmgrThreadMain
-03801b08 00000024 t _wlmgrCmdPxiHandler
-03801b2c 0000002c T _netbufRx
-03801b58 00000028 T wlmgrStartServer
-03801b80 00000026 t _ntrwifiOnStateLost
-03801ba8 0000002e t _ntrwifiOnScanEnd
-03801bd8 0000004e t _ntrwifiOnAssocEnd
-03801c28 0000003a t _ntrwifiOnJoinEnd
-03801c64 00000034 t _ntrwifiOnBssInfo
-03801c98 00000052 t _ntrwifiOnAuthEnd
-03801cec 00000020 t _ntrwifiRx
-03801d0c 000000b4 T ntrwifiInit
-03801dc0 00000024 T ntrwifiExit
-03801de4 00000038 T ntrwifiStartScan
-03801e1c 0000002c T ntrwifiAssociate
-03801e48 00000016 T ntrwifiDisassociate
-03801e5e 00000028 T ntrwifiTx
-03801e88 0000002c T _mwlBbpRead
-03801eb4 00000030 T _mwlBbpWrite
-03801ee4 00000028 T _mwlRfCmd
-03801f0c 0000002e t _mwlTaskHandler
-03801f3c 00000064 t _mwlExitTask
-03801fa0 000000a6 T mwlDevStop
-03802048 0000022c T mwlDevStart
-03802274 00000030 T mwlDevGracefulStop
-038022a4 00000060 T _mwlPushTask
-03802304 00000094 T _mwlPopTask
-03802398 000000e0 T _mwlIrqHandler
-03802478 000000b6 T mwlDevWlanToDix
-03802530 000000cc T mwlDevDixToWlan
-038025fc 00000018 t _mwlRxRead
-03802614 0000005c t _mwlRxProbeResFrame
-03802670 00000100 t _mwlRxBeaconFrame
-03802770 00000186 T _mwlRxEndTask
-038028f8 000000a2 T _mwlRxMgmtCtrlTask
-0380299c 00000042 T _mwlRxDataTask
-038029e0 00000030 T _mwlRxQueueClear
-03802a10 00000034 t _mwlTxWrite
-03802a44 00000182 t _mwlTxQueueKick
-03802bc8 000000a2 T _mwlTxEndTask
-03802c6c 0000009e T _mwlTxQueueClear
-03802d0c 00000048 T mwlDevTx
-03802d54 0000004a t _mwlSetMlmeState
-03802da0 0000000e t _mwlMlmeAuthRaceWorkaround
-03802db0 00000034 t _mwlMlmeScanTimeout
-03802de4 0000000e t _mwlMlmeJoinTimeout
-03802df2 0000000e t _mwlMlmeAuthTimeout
-03802e00 0000000e t _mwlMlmeAssocTimeout
-03802e10 000000e6 t _mwlMlmeTaskScan
-03802ef8 0000002c t _mwlMlmeDeauthTxCb
-03802f24 00000046 T _mwlMlmeOnBssInfo
-03802f6c 0000005c T _mwlMlmeHandleJoin
-03802fc8 000000ec T _mwlMlmeHandleAuth
-038030b4 0000001c T _mwlMlmeAuthFreeReply
-038030d0 0000002c T _mwlMlmeHandleAssocResp
-038030fc 00000044 T _mwlMlmeHandleStateLoss
-03803140 0000002c T _mwlMlmeBeaconLostTask
-0380316c 00000136 T _mwlMlmeTask
-038032a4 00000008 T mwlMlmeGetCallbacks
-038032ac 000000cc T mwlMlmeScan
-03803378 000000b0 T mwlMlmeJoin
-03803428 000000a4 T mwlMlmeAuthenticate
-038034cc 0000007c T mwlMlmeAssociate
-03803548 00000050 T mwlMlmeDeauthenticate
-03803598 00000034 T irqSet
-038035cc 0000001c t _tickCountIsr
-038035e8 00000070 T tickInit
-03803658 0000004c T tickGetCount
-038036a4 00000044 t _tickTaskSchedule
-038036e8 00000076 t _tickTaskIsr
-03803760 0000007c T tickTaskStart
-038037dc 00000054 T tickTaskStop
-03803830 000000f4 t threadUpdateDynamicPrio
-03803924 000000c2 t threadRemoveWaiter
-038039e8 000000da T mutexLock
-03803ac4 0000008a T mutexUnlock
-03803b50 0000000c T __syscall_getreent
-03803b5c 00000028 T __syscall_lock_acquire_recursive
-03803b84 00000016 T __syscall_lock_release_recursive
-03803b9c 0000014c T __irq_handler
-03803ce8 0000009a T netbufAlloc
-03803d84 00000046 T netbufFree
-03803dcc 00000080 t _wlanParseRsn
-03803e4c 00000034 T wlanGetRateBit
-03803e80 00000058 T wlanFindOrAddBss
-03803ed8 00000054 T wlanFindRsnOrWpaIe
-03803f2c 000001b4 T wlanParseBeacon
-038040e0 00000028 t _nvramSpiBegin
-03804108 00000050 T nvramWaitReady
-03804158 000000a0 T nvramReadDataBytes
-038041f8 00000054 t _tscPowerDownBetweenConversions
-0380424c 00000138 t _tscTryReadChannel
-03804384 0000002c t _tscDetectTouch
-038043b0 0000000c T tscInit
-038043bc 00000084 T tscReadTouch
-03804440 000000a4 T smutexLock
-038044e4 0000008c T smutexUnlock
-03804570 00000068 T operator new(unsigned int)
-038045d8 0000000c T std::bad_alloc::what() const
-038045e4 00000024 T std::bad_alloc::~bad_alloc()
-038045e4 00000024 T std::bad_alloc::~bad_alloc()
-03804608 00000030 T std::bad_alloc::~bad_alloc()
-03804638 00000010 T operator delete(void*, unsigned int)
-03804648 0000000c W __gnu_cxx::__concurrence_lock_error::what() const
-03804654 0000000c W __gnu_cxx::__concurrence_unlock_error::what() const
-03804660 00000024 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
-03804660 00000024 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
-03804684 00000030 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
-038046b4 00000024 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
-038046b4 00000024 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
-038046d8 00000030 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
-03804708 00000128 t (anonymous namespace)::pool::free(void*) [clone .constprop.0]
-03804830 000000f4 t (anonymous namespace)::pool::allocate(unsigned int) [clone .constprop.0]
-03804924 00000048 T __cxa_allocate_exception
-0380496c 00000038 T __cxa_free_exception
-038049a4 00000004 T std::exception::~exception()
-038049a4 00000004 T std::exception::~exception()
-038049a8 00000004 T std::bad_exception::~bad_exception()
-038049a8 00000004 T std::bad_exception::~bad_exception()
-038049ac 0000000c T transaction clone for std::exception::what() const
-038049ac 0000000c T std::exception::what() const
-038049b8 0000000c T transaction clone for std::bad_exception::what() const
-038049b8 0000000c T std::bad_exception::what() const
-038049c4 00000024 T std::bad_exception::~bad_exception()
-038049e8 0000015c t read_encoded_value_with_base(unsigned char, unsigned int, unsigned char const*, unsigned int*)
-03804b44 00000080 t base_of_encoded_value(unsigned char, _Unwind_Context*)
-03804bc4 000000f4 t parse_lsda_header(_Unwind_Context*, unsigned char const*, lsda_header_info*)
-03804cb8 000006f8 T __gxx_personality_v0
-038053b0 00000018 T __cxxabiv1::__terminate(void (*)())
-038053c8 00000074 T std::get_terminate()
-0380543c 00000010 T __cxxabiv1::__unexpected(void (*)())
-0380544c 00000074 T std::get_unexpected()
-038054c0 00000098 t __gxx_exception_cleanup(_Unwind_Reason_Code, _Unwind_Control_Block*)
-03805558 00000074 T __cxa_init_primary_exception
-038055cc 00000054 T __cxa_throw
-03805620 000000b0 T __cxa_rethrow
-038056d0 00000074 T std::get_new_handler()
-03805744 00000024 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
-03805744 00000024 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
-03805768 00000030 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
-03805798 00000148 T __cxxabiv1::__si_class_type_info::__do_dyncast(int, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__dyncast_result&) const
-038058e0 0000008c T __cxxabiv1::__si_class_type_info::__do_find_public_src(int, void const*, __cxxabiv1::__class_type_info const*, void const*) const
-0380596c 0000004c T __cxxabiv1::__si_class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__upcast_result&) const
-038059b8 00000004 T std::type_info::~type_info()
-038059b8 00000004 T std::type_info::~type_info()
-038059bc 00000008 T std::type_info::__is_pointer_p() const
-038059bc 00000008 T std::type_info::__is_function_p() const
-038059c4 000000f8 T __gnu_cxx::__exchange_and_add(int volatile*, int)
-03805abc 00000064 T __cxxabiv1::__class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void**) const
-03805b20 00000014 T __cxxabiv1::__class_type_info::__do_find_public_src(int, void const*, __cxxabiv1::__class_type_info const*, void const*) const
-03805b34 00000024 T __cxxabiv1::__class_type_info::~__class_type_info()
-03805b34 00000024 T __cxxabiv1::__class_type_info::~__class_type_info()
-03805b58 00000030 T __cxxabiv1::__class_type_info::~__class_type_info()
-03805b88 00000078 T __cxxabiv1::__class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__upcast_result&) const
-03805c00 00000098 T __cxxabiv1::__class_type_info::__do_catch(std::type_info const*, void**, unsigned int) const
-03805c98 00000100 T __cxxabiv1::__class_type_info::__do_dyncast(int, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__dyncast_result&) const
-03805d98 00000010 T operator delete(void*)
-03805da8 T __cxa_end_cleanup
-03805db8 00000144 T __cxa_type_match
-03805efc 000000bc T __cxa_begin_cleanup
-03805fb8 000000bc T __gnu_end_cleanup
-03806074 000000e8 T __cxa_begin_catch
-0380615c 000000e0 T __cxa_end_catch
-0380623c 0000003c t eh_globals_dtor(void*)
-03806278 0000003c T __cxa_get_globals_fast
-038062b4 00000094 T __cxa_get_globals
-03806348 0000000c W __gnu_cxx::__concurrence_broadcast_error::what() const
-03806354 0000000c W __gnu_cxx::__concurrence_wait_error::what() const
-03806360 0000003c t (anonymous namespace)::init()
-0380639c 00000024 t (anonymous namespace)::init_static_cond()
-038063c0 00000024 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
-038063c0 00000024 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
-038063e4 00000030 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
-03806414 00000024 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
-03806414 00000024 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
-03806438 00000030 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
-03806468 000001b0 T __cxa_guard_acquire
-03806618 000000e4 T __cxa_guard_release
-038066fc 00000024 T __gnu_cxx::recursive_init_error::~recursive_init_error()
-038066fc 00000024 T __gnu_cxx::recursive_init_error::~recursive_init_error()
-03806720 00000030 T __gnu_cxx::recursive_init_error::~recursive_init_error()
-03806750 00000010 T __gnu_cxx::recursive_init_error::recursive_init_error()
-03806750 00000010 T __gnu_cxx::recursive_init_error::recursive_init_error()
-03806760 00000012 T __gnu_thumb1_case_sqi
-03806774 00000012 T __gnu_thumb1_case_uqi
-03806788 t .udivsi3_skip_div0_test
-03806788 T __aeabi_uidiv
-03806788 000000f4 T __udivsi3
-0380687c 00000020 T __aeabi_uidivmod
-0380689c T __aeabi_idiv
-0380689c 00000128 T __divsi3
-038068a4 t .divsi3_skip_div0_test
-038069c4 00000020 T __aeabi_idivmod
-038069e4 00000004 W __aeabi_idiv0
-038069e4 00000004 W __aeabi_ldiv0
-038069e8 T __aeabi_uldivmod
-03806a24 T __sync_synchronize
-03806a24 00000004 T __sync_synchronize_none
-03806a28 00000018 T __aeabi_lmul
-03806a28 00000018 T __muldi3
-03806a40 00000044 T __popcountsi2
-03806a84 00000014 T __bswapsi2
-03806a98 00000140 T __udivmoddi4
-03806bd8 00000018 t selfrel_offset31
-03806bf0 00000098 t search_EIT_table
-03806c88 00000040 t __gnu_unwind_get_pr_addr
-03806cc8 0000011c t get_eit_entry
-03806de4 00000090 t restore_non_core_regs
-03806e74 00000014 t _Unwind_decode_typeinfo_ptr.constprop.0
-03806e88 00000004 t _Unwind_DebugHook
-03806e8c 00000068 t unwind_phase2
-03806ef4 00000150 t unwind_phase2_forced
-03807044 000000ac T __gnu_Unwind_RaiseException
-038070f0 00000020 T __gnu_Unwind_ForcedUnwind
-03807110 00000078 T __gnu_Unwind_Resume
-03807188 0000001c T __gnu_Unwind_Resume_or_Rethrow
-038071a4 00000004 T _Unwind_Complete
-038071a8 00000018 T _Unwind_DeleteException
-038071c0 00000064 T _Unwind_VRS_Get
-03807224 00000030 t _Unwind_GetGR
-03807254 00000064 T _Unwind_VRS_Set
-038072b8 00000030 t _Unwind_SetGR
-038072e8 000000cc T __gnu_Unwind_Backtrace
-038073b4 00000418 t __gnu_unwind_pr_common
-038077cc 00000008 T __aeabi_unwind_cpp_pr0
-038077d4 00000008 W __aeabi_unwind_cpp_pr1
-038077dc 00000008 W __aeabi_unwind_cpp_pr2
-038077e4 00000464 T _Unwind_VRS_Pop
-03807c48 0000001c T __restore_core_regs
-03807c48 0000001c T restore_core_regs
-03807c64 T __gnu_Unwind_Restore_VFP
-03807c6c T __gnu_Unwind_Save_VFP
-03807c74 T __gnu_Unwind_Restore_VFP_D
-03807c7c T __gnu_Unwind_Save_VFP_D
-03807c84 T __gnu_Unwind_Restore_VFP_D_16_to_31
-03807c8c T __gnu_Unwind_Save_VFP_D_16_to_31
-03807c94 T __gnu_Unwind_Restore_WMMXD
-03807cd8 T __gnu_Unwind_Save_WMMXD
-03807d1c T __gnu_Unwind_Restore_WMMXC
-03807d30 T __gnu_Unwind_Save_WMMXC
-03807d44 00000024 T _Unwind_RaiseException
-03807d44 00000024 T ___Unwind_RaiseException
-03807d68 00000024 T _Unwind_Resume
-03807d68 00000024 T ___Unwind_Resume
-03807d8c 00000024 T _Unwind_Resume_or_Rethrow
-03807d8c 00000024 T ___Unwind_Resume_or_Rethrow
-03807db0 00000024 T _Unwind_ForcedUnwind
-03807db0 00000024 T ___Unwind_ForcedUnwind
-03807dd4 00000024 T _Unwind_Backtrace
-03807dd4 00000024 T ___Unwind_Backtrace
-03807df8 00000060 t next_unwind_byte
-03807e58 00000030 t _Unwind_GetGR.constprop.0
-03807e88 00000004 t unwind_UCB_from_context
-03807e8c 00000470 T __gnu_unwind_execute
-038082fc 0000004c T __gnu_unwind_frame
-03808348 00000014 T _Unwind_GetRegionStart
-0380835c 00000020 T _Unwind_GetLanguageSpecificData
-0380837c 00000028 T __clzdi2
-038083a4 00000048 T __clzsi2
-038083ec 00000144 T strchr
-03808530 00000028 T getenv
-03808558 000000e0 T memcmp
-03808638 000001f0 t _strtoul_l.isra.0
-03808828 0000003c T strtoul
-03808864 00000014 T abort
-03808878 00000048 T malloc
-038088c0 00000024 T free
-038088e4 000000f4 T memset
-038089d8 00000018 T __malloc_lock
-038089f0 00000018 T __malloc_unlock
-03808a08 00000224 T strcmp
-03808c2c 00000130 T memcpy
-03808d5c 000000e0 T strncmp
-03808e3c 00000020 T raise
-03808e5c 00000018 T __env_lock
-03808e74 00000018 T __env_unlock
-03808e8c 00000030 T __getreent
-03808ebc 00000020 T __libc_lock_acquire_recursive
-03808edc 00000020 T __libc_lock_release_recursive
-03808f00 0000000c t __ntrwifiAssociate_from_arm
-03808f0c 00000010 t __mwlDevSetMode_veneer
-03808f1c 0000000c t __touchStartServer_from_arm
-03808f28 0000000c t __ntrwifiDisassociate_from_arm
-03808f34 00000010 t __mwlDevReset_veneer
-03808f44 0000000c t __rtcSyncTime_from_arm
-03808f50 00000010 t ___mwlMgmtMakeAssocReq_veneer
-03808f60 0000000c t ____syscall_lock_acquire_recursive_from_arm
-03808f6c 00000008 t __twlSdIsInserted_from_thumb
-03808f74 00000010 t ___mwlMgmtMakeProbeReq_veneer
-03808f84 0000000c t __pxiSendPacket_from_arm
-03808f90 00000010 t ___mwlMgmtMakeAuth_veneer
-03808fa0 0000000c t __envReadNvramSettings_from_arm
-03808fac 0000000c t __wlmgrStartServer_from_arm
-03808fb8 00000008 t __twlSdReadSectors_from_thumb
-03808fc0 0000000c t __pmInit_from_arm
-03808fcc 00000008 t __memset_from_thumb
-03808fd4 0000000c t __ntrwifiStartScan_from_arm
-03808fe0 00000008 t __twlSdWriteSectors_from_thumb
-03808fe8 00000008 t __twlwifiTx_from_thumb
-03808ff0 0000000c t __mailboxTryRecv_from_arm
-03808ffc 0000000c t ____syscall_getreent_from_arm
-03809008 00000010 t __mwlDevSetSsid_veneer
-03809018 0000000c t ____syscall_lock_release_recursive_from_arm
-03809024 0000000c t __threadPrepare_from_arm
-03809030 00000008 t __memcpy_from_thumb
-03809038 00000008 t __twlNandReadSectors_from_thumb
-03809040 00000008 t __twlNandReadSectorsAes_from_thumb
-03809048 00000010 t __mwlDevWakeUp_veneer
-03809058 00000010 t ___mwlMgmtMakeDeauth_veneer
-03809068 00000008 t ___wlmgrPxiProcessCmd.isra.0_from_thumb
-03809070 0000000c t __rtcInit_from_arm
-0380907c 00000010 t __mwlDevSetBssid_veneer
-0380908c 0000000c t __threadStart_from_arm
-03809098 0000000c t __pmSetSleepAllowed_from_arm
-038090a4 0000000c t __ntrwifiInit_from_arm
-038090b0 0000000c t __pmMainLoop_from_arm
-038090bc 00000008 t __twlNandWriteSectorsAes_from_thumb
-038090c4 0000000c t __threadSleepTicks_from_arm
-038090d0 00000010 t __mwlCalibLoad_veneer
-038090e0 0000000c t __touchInit_from_arm
-038090ec 0000000c t __keypadStartExtServer_from_arm
-038090f8 00000008 t __twlSdInit_from_thumb
-03809100 00000008 t ____aeabi_uldivmod_from_thumb
-03809108 00000010 t __mwlDevShutdown_veneer
-03809118 00000010 t __mwlDevSetPreamble_veneer
-03809128 0000000c t ___wlmgrSetState_from_arm
-03809134 0000000c t ___wlmgrStop_from_arm
-03809140 00000008 t __twlNandInit_from_thumb
-03809148 0000000c t __blkInit_from_arm
-03809154 00000008 t __twlNandWriteSectors_from_thumb
-0380915c 00000008 t ____aeabi_idiv_from_thumb
-03809164 00000008 t __twlblkInit_from_thumb
-0380916c 00000010 t __mwlDevSetAuth_veneer
-0380917c 00000010 t __mwlDevSetChannel_veneer
-0380918c 0000000c t __pxiWaitForPing_from_arm
-03809198 00000008 t __twlwifiExit_from_thumb
-038091a0 00000008 t __memcmp_from_thumb
-038091a8 0000000c t __pxiSetMailbox_from_arm
-038091b4 0000000c t __threadIrqWait_from_arm
-038091c0 00000008 t ____aeabi_lmul_from_thumb
-03809438 00000018 t s_monthDayOffsets.0
-03809458 0000001c t s_mwlTaskHandlers
-03809474 0000000c t s_wlanRates
-0380958c 0000000d T typeinfo name for std::bad_alloc
-0380959c 0000000c T typeinfo for std::bad_alloc
-038095a8 00000014 T vtable for std::bad_alloc
-038095bc 00000027 V typeinfo name for __gnu_cxx::__concurrence_lock_error
-038095e4 0000000c V typeinfo for __gnu_cxx::__concurrence_lock_error
-038095f0 00000029 V typeinfo name for __gnu_cxx::__concurrence_unlock_error
-0380961c 0000000c V typeinfo for __gnu_cxx::__concurrence_unlock_error
-03809628 00000014 V vtable for __gnu_cxx::__concurrence_lock_error
-0380963c 00000014 V vtable for __gnu_cxx::__concurrence_unlock_error
-03809650 0000000d T typeinfo name for std::exception
-03809660 00000008 T typeinfo for std::exception
-03809668 00000012 T typeinfo name for std::bad_exception
-0380967c 0000000c T typeinfo for std::bad_exception
-03809688 00000020 T typeinfo name for __cxxabiv1::__forced_unwind
-038096a8 00000008 T typeinfo for __cxxabiv1::__forced_unwind
-038096b0 00000024 T typeinfo name for __cxxabiv1::__foreign_exception
-038096d4 00000008 T typeinfo for __cxxabiv1::__foreign_exception
-038096dc 00000014 T vtable for std::bad_exception
-03809704 00000025 T typeinfo name for __cxxabiv1::__si_class_type_info
-0380972c 0000000c T typeinfo for __cxxabiv1::__si_class_type_info
-03809738 0000002c T vtable for __cxxabiv1::__si_class_type_info
-03809764 0000000d T typeinfo name for std::type_info
-03809774 00000008 T typeinfo for std::type_info
-0380977c 00000022 T typeinfo name for __cxxabiv1::__class_type_info
-038097a0 0000000c T typeinfo for __cxxabiv1::__class_type_info
-038097ac 0000002c T vtable for __cxxabiv1::__class_type_info
-038097d8 0000002c V typeinfo name for __gnu_cxx::__concurrence_broadcast_error
-03809804 0000000c V typeinfo for __gnu_cxx::__concurrence_broadcast_error
-03809810 00000027 V typeinfo name for __gnu_cxx::__concurrence_wait_error
-03809838 0000000c V typeinfo for __gnu_cxx::__concurrence_wait_error
-03809844 00000014 V vtable for __gnu_cxx::__concurrence_broadcast_error
-03809858 00000014 V vtable for __gnu_cxx::__concurrence_wait_error
-0380986c 00000023 T typeinfo name for __gnu_cxx::recursive_init_error
-03809890 0000000c T typeinfo for __gnu_cxx::recursive_init_error
-0380989c 00000014 T vtable for __gnu_cxx::recursive_init_error
-038098c8 00000101 T _ctype_
-038099d0 00000004 D __cxxabiv1::__unexpected_handler
-038099d4 00000004 D __cxxabiv1::__terminate_handler
-038099d8 00000004 D __malloc_sbrk_base
-038099dc 00000004 D __malloc_trim_threshold
-038099e0 00000408 D __malloc_av_
-03809de8 00000004 D environ
-03809dec 00000004 D _impure_ptr
-03809df0 d __wram_end
-03809df0 b completed.1
-03809df4 b object.0
-03809e0c 00000200 b (anonymous namespace)::s_audioMailboxSlots
-0380a00c 00000008 b (anonymous namespace)::s_audioMailbox
-0380a018 00001000 b (anonymous namespace)::s_audioThreadStack
-0380b018 00000070 b (anonymous namespace)::s_audioThread
-0380b088 00001438 b (anonymous namespace)::s_acp
-0380c4c0 00000008 b s_sleepThreads
-0380c4c8 00000008 b s_joinThreads
-0380c4d0 00000070 b s_idleThread
-0380c540 00000070 b s_mainThread
-0380c5b0 00000100 B __irq_table
-0380c6b0 00000024 B __sched_state
-0380c6d4 00000008 b s_mailboxRecvQueue
-0380c6dc 000001f0 b s_pxiChannels
-0380c8cc 00000004 b s_pxiRecvState
-0380c8d0 00000008 b s_pxiRecvQueue
-0380c8d8 00000004 b s_pxiSendMutex
-0380c8dc 00000010 b s_keypadTask
-0380c8f0 00000200 b s_pmPxiThreadStack
-0380caf0 00000070 b s_pmPxiThread
-0380cb60 0000000c b s_pmState
-0380cb6c 00000010 b s_rtcUpdateTask
-0380cb7c 00000004 b s_rtcMutex
-0380cb80 00000004 B g_spiMutex
-0380cb88 00000100 b s_touchSrvThreadStack
-0380cc88 00000070 b s_touchSrvThread
-0380ccf8 0000001c b s_touchState
-0380cd18 00000400 b s_blkPxiThreadStack
-0380d118 00000070 b s_blkPxiThread
-0380d188 00000020 b s_blkPxiMailboxData
-0380d1a8 00000008 b s_blkPxiMailbox
-0380d1b0 00000001 b s_blkHasTwl
-0380d1b4 00000004 b s_dldiDiscIface
-0380d1b8 00000020 b s_wlmgrState
-0380d1d8 00000800 b s_wlmgrThreadStack
-0380d9d8 00000070 b s_wlmgrThread
-0380da48 0000000c b s_assocVars
-0380da54 00000010 b s_scanVars
-0380da68 00000600 b s_mwlThreadStack
-0380e068 00000070 b s_mwlThread
-0380e0d8 00000100 B s_mwlState
-0380e1d8 00000008 b s_mwlTaskQueue
-0380e1e0 00000420 b s_mwlRxStaticMem
-0380e600 00000004 b s_firstTask
-0380e608 00000008 b s_highTickCount
-0380e610 00000001 b s_tickInit
-0380e611 00000001 B g_cdcIsTwlMode
-0380e612 00000001 B g_isTwlMode
-0380e613 00000001 b touching.0
-0380e614 00000008 b s_smutexWaitList
-0380e620 0000001c b (anonymous namespace)::emergency_pool
-0380e640 00000010 b (anonymous namespace)::mx
-0380e650 00000004 b (anonymous namespace)::__new_handler
-0380e658 00000010 b (anonymous namespace)::mx
-0380e668 00000004 b guard variable for (anonymous namespace)::get_atomic_mutex()::atomic_mutex
-0380e670 00000010 b (anonymous namespace)::get_atomic_mutex()::atomic_mutex
-0380e680 00000004 b init
-0380e684 00000001 B __eh_globals_init::_S_init
-0380e688 0000000c b (anonymous namespace)::eh_globals
-0380e694 00000004 b (anonymous namespace)::get_static_cond()::once
-0380e698 00000008 b (anonymous namespace)::fake_cond
-0380e6a0 00000004 b (anonymous namespace)::static_cond
-0380e6a4 00000004 b (anonymous namespace)::get_static_mutex()::once
-0380e6a8 00000010 b (anonymous namespace)::fake_mutex
-0380e6b8 00000004 b (anonymous namespace)::static_mutex
-0380e6bc 00000028 B __malloc_current_mallinfo
-0380e6e4 00000004 B __malloc_max_total_mem
-0380e6e8 00000004 B __malloc_max_sbrked_mem
-0380e6ec 00000004 B __malloc_top_pad
-0380e6f0 0000000c b __malloc_recursive_mutex
-0380e6fc 0000000c b __env_recursive_mutex
-0380e708 00000004 b initial_env
-0380e70c 00000004 B fake_heap_start
-0380e710 00000004 B fake_heap_end
-0380e714 00000004 b heap_start.0
-0380e718 00000168 B __sf
-0380e880 00000004 B __stdio_exit_handler
-0380e884 b __wram_bss_end
+037f85a8 000003dc t (anonymous namespace)::AudioThreadMain(void*)
+037f8984 000000e8 T gtAudioOffloadInit
+037f8a6c 00000008 T mos6502::Addr_ACC()
+037f8a74 00000014 T mos6502::Addr_IMM()
+037f8a88 00000010 T mos6502::Op_ILLEGAL(unsigned short)
+037f8a98 00000190 T mos6502::Op_ADC(unsigned short)
+037f8c28 000000a4 T mos6502::Op_AND(unsigned short)
+037f8ccc 000000e4 T mos6502::Op_ASL(unsigned short)
+037f8db0 00000054 T mos6502::Op_ASL_ACC(unsigned short)
+037f8e04 00000080 T mos6502::Op_BIT(unsigned short)
+037f8e84 00000010 T mos6502::Op_WAI(unsigned short)
+037f8e94 00000014 T mos6502::Op_STP(unsigned short)
+037f8ea8 00000014 T mos6502::Op_CLC(unsigned short)
+037f8ebc 00000014 T mos6502::Op_CLD(unsigned short)
+037f8ed0 00000014 T mos6502::Op_CLI(unsigned short)
+037f8ee4 00000014 T mos6502::Op_CLV(unsigned short)
+037f8ef8 000000ac T mos6502::Op_CMP(unsigned short)
+037f8fa4 000000ac T mos6502::Op_CPX(unsigned short)
+037f9050 000000ac T mos6502::Op_CPY(unsigned short)
+037f90fc 000000d8 T mos6502::Op_DEC(unsigned short)
+037f91d4 00000048 T mos6502::Op_DEC_ACC(unsigned short)
+037f921c 00000048 T mos6502::Op_DEX(unsigned short)
+037f9264 00000048 T mos6502::Op_DEY(unsigned short)
+037f92ac 00000088 T mos6502::Op_EOR(unsigned short)
+037f9334 000000c8 T mos6502::Op_INC(unsigned short)
+037f93fc 00000038 T mos6502::Op_INC_ACC(unsigned short)
+037f9434 00000038 T mos6502::Op_INX(unsigned short)
+037f946c 00000038 T mos6502::Op_INY(unsigned short)
+037f94a4 0000000c T mos6502::Op_JMP(unsigned short)
+037f94b0 0000009c T mos6502::Op_LDA(unsigned short)
+037f954c 0000009c T mos6502::Op_LDX(unsigned short)
+037f95e8 0000009c T mos6502::Op_LDY(unsigned short)
+037f9684 000000c8 T mos6502::Op_LSR(unsigned short)
+037f974c 00000034 T mos6502::Op_LSR_ACC(unsigned short)
+037f9780 00000004 T mos6502::Op_NOP(unsigned short)
+037f9784 000000a8 T mos6502::Op_ORA(unsigned short)
+037f982c 000000f0 T mos6502::Op_ROL(unsigned short)
+037f991c 00000058 T mos6502::Op_ROL_ACC(unsigned short)
+037f9974 00000110 T mos6502::Op_ROR(unsigned short)
+037f9a84 00000074 T mos6502::Op_ROR_ACC(unsigned short)
+037f9af8 0000011c T mos6502::Op_SBC(unsigned short)
+037f9c14 00000014 T mos6502::Op_SEC(unsigned short)
+037f9c28 00000014 T mos6502::Op_SED(unsigned short)
+037f9c3c 00000014 T mos6502::Op_SEI(unsigned short)
+037f9c50 0000005c T mos6502::Op_STA(unsigned short)
+037f9cac 00000060 T mos6502::Op_STZ(unsigned short)
+037f9d0c 0000005c T mos6502::Op_STX(unsigned short)
+037f9d68 0000005c T mos6502::Op_STY(unsigned short)
+037f9dc4 00000040 T mos6502::Op_TAX(unsigned short)
+037f9e04 00000040 T mos6502::Op_TAY(unsigned short)
+037f9e44 00000040 T mos6502::Op_TSX(unsigned short)
+037f9e84 00000040 T mos6502::Op_TXA(unsigned short)
+037f9ec4 00000010 T mos6502::Op_TXS(unsigned short)
+037f9ed4 00000040 T mos6502::Op_TYA(unsigned short)
+037f9f14 0000002c T mos6502::Op_BRA(unsigned short)
+037f9f40 000000c0 T mos6502::Op_TRB(unsigned short)
+037fa000 000000c0 T mos6502::Op_TSB(unsigned short)
+037fa0c0 0000003c T mos6502::Op_BVS(unsigned short)
+037fa0fc 00000008 T mos6502::Addr_IMP()
+037fa104 0000003c T mos6502::Op_BPL(unsigned short)
+037fa140 0000003c T mos6502::Op_BCS(unsigned short)
+037fa17c 0000003c T mos6502::Op_BCC(unsigned short)
+037fa1b8 0000003c T mos6502::Op_BEQ(unsigned short)
+037fa1f4 0000003c T mos6502::Op_BMI(unsigned short)
+037fa230 0000003c T mos6502::Op_BNE(unsigned short)
+037fa26c 0000003c T mos6502::Op_BVC(unsigned short)
+037fa2a8 0000007c T mos6502::Op_PLP(unsigned short)
+037fa324 000000b4 T mos6502::Op_PLA(unsigned short)
+037fa3d8 000000b4 T mos6502::Op_PLX(unsigned short)
+037fa48c 000000b4 T mos6502::Op_PLY(unsigned short)
+037fa540 000000f0 T mos6502::Op_RTS(unsigned short)
+037fa630 0000006c T mos6502::Addr_ZER()
+037fa69c 00000158 T mos6502::Op_RTI(unsigned short)
+037fa7f4 00000070 T mos6502::Addr_ZEX()
+037fa864 00000070 T mos6502::Addr_ZEY()
+037fa8d4 0000008c T mos6502::Addr_REL()
+037fa960 0000006c T mos6502::Op_PHA(unsigned short)
+037fa9cc 0000006c T mos6502::Op_PHX(unsigned short)
+037faa38 0000006c T mos6502::Op_PHY(unsigned short)
+037faaa4 00000070 T mos6502::Op_PHP(unsigned short)
+037fab14 000000cc T mos6502::Addr_ABS()
+037fabe0 000000ec T mos6502::Addr_ABX()
+037faccc 000000ec T mos6502::Addr_ABY()
+037fadb8 00000110 T mos6502::Addr_ZPI()
+037faec8 0000011c T mos6502::Addr_INX()
+037fafe4 00000160 T mos6502::Op_BBS6(unsigned short)
+037fb144 000000ec T mos6502::Op_JSR(unsigned short)
+037fb230 00000130 T mos6502::Addr_INY()
+037fb360 00000184 T mos6502::Addr_ABI()
+037fb4e4 00000188 T mos6502::Addr_AIX()
+037fb66c 00000200 T mos6502::Op_BRK(unsigned short)
+037fb86c 00000160 T mos6502::Op_BBR7(unsigned short)
+037fb9cc 00000160 T mos6502::Op_BBS7(unsigned short)
+037fbb2c 00000160 T mos6502::Op_BBR0(unsigned short)
+037fbc8c 00000160 T mos6502::Op_BBR1(unsigned short)
+037fbdec 00000160 T mos6502::Op_BBR2(unsigned short)
+037fbf4c 00000160 T mos6502::Op_BBR3(unsigned short)
+037fc0ac 00000160 T mos6502::Op_BBR4(unsigned short)
+037fc20c 00000160 T mos6502::Op_BBR5(unsigned short)
+037fc36c 00000160 T mos6502::Op_BBR6(unsigned short)
+037fc4cc 00000160 T mos6502::Op_BBS0(unsigned short)
+037fc62c 00000160 T mos6502::Op_BBS1(unsigned short)
+037fc78c 00000160 T mos6502::Op_BBS2(unsigned short)
+037fc8ec 00000160 T mos6502::Op_BBS3(unsigned short)
+037fca4c 00000160 T mos6502::Op_BBS4(unsigned short)
+037fcbac 00000160 T mos6502::Op_BBS5(unsigned short)
+037fcd0c 000000a4 T mos6502::Op_RMB0(unsigned short)
+037fcdb0 000000a4 T mos6502::Op_RMB1(unsigned short)
+037fce54 000000a4 T mos6502::Op_RMB2(unsigned short)
+037fcef8 000000a4 T mos6502::Op_RMB3(unsigned short)
+037fcf9c 000000a4 T mos6502::Op_RMB4(unsigned short)
+037fd040 000000a4 T mos6502::Op_RMB5(unsigned short)
+037fd0e4 000000a4 T mos6502::Op_RMB6(unsigned short)
+037fd188 000000a4 T mos6502::Op_RMB7(unsigned short)
+037fd22c 000000a8 T mos6502::Op_SMB0(unsigned short)
+037fd2d4 000000a8 T mos6502::Op_SMB1(unsigned short)
+037fd37c 000000a8 T mos6502::Op_SMB2(unsigned short)
+037fd424 000000a8 T mos6502::Op_SMB3(unsigned short)
+037fd4cc 000000a8 T mos6502::Op_SMB4(unsigned short)
+037fd574 000000a8 T mos6502::Op_SMB5(unsigned short)
+037fd61c 000000a8 T mos6502::Op_SMB6(unsigned short)
+037fd6c4 000000ac T mos6502::Op_SMB7(unsigned short)
+037fd770 000000e4 T mos6502::Reset()
+037fd854 0000165c T mos6502::mos6502(unsigned char (*)(unsigned short), void (*)(unsigned short, unsigned char), void (*)(), unsigned char (*)(unsigned short))
+037fd854 0000165c T mos6502::mos6502(unsigned char (*)(unsigned short), void (*)(unsigned short, unsigned char), void (*)(), unsigned char (*)(unsigned short))
+037feeb0 0000022c T mos6502::IRQ()
+037ff0dc 000004a4 t mos6502::Run(long, unsigned long long&, mos6502::CycleMethod) [clone .part.0] [clone .constprop.0]
+037ff580 00000014 T mos6502::ClearIRQ()
+037ff594 00000200 T mos6502::NMI()
+037ff794 00000024 T mos6502::RunOptimized(long, unsigned long long&)
+037ff7b8 00000072 T threadExit
+037ff82c 0000001e t _threadTickTask
+037ff84c 00000080 T _threadInit
+037ff8cc 0000006c T threadPrepare
+037ff938 00000086 T threadStart
+037ff9c0 00000046 T threadJoin
+037ffa08 00000070 T threadIrqWait
+037ffa78 0000004a T threadSleepTicks
+037ffac4 0000008c t threadReschedule
+037ffb50 000000c0 T threadBlock
+037ffc10 000000f0 T threadUnblockOneByValue
+037ffd00 000000d4 T threadUnblockAllByValue
+037ffdd4 000000d8 T threadUnblockAllByMask
+037ffeac 0000006c T mailboxTrySend
+037fff18 00000054 T mailboxTryRecv
+037fff6c 00000066 T mailboxRecv
+037fffd4 0000004c T armCopyMem32
+03800020 00000058 T armFillMem32
+03800078 0000002c T armContextSave
+038000a4 00000020 T armContextLoad
+038000a8 T armContextLoadFromSvc
+038000c4 00000008 T armSwapWord
+038000cc 00000014 T armIrqLockByPsr
+038000e0 00000014 T armIrqUnlockByPsr
+038000f4 00000004 T svcWaitByLoop
+038000f8 00000004 T svcHalt
+038000fc 00000004 T svcSleep
+03800100 00000004 T svcGetCRC16
+03800104 00000006 T svcCustomHalt
+0380010a 0000000c t _pxiMailboxHandler
+03800116 00000002 W _pxiRecvUnhandled
+03800118 000000c0 t _pxiRecvIrqHandler
+038001d8 00000054 T _pxiInit
+0380022c 00000012 T pxiWaitForPing
+03800240 00000054 T pxiSetHandler
+03800294 00000014 T pxiSetMailbox
+038002a8 00000020 T pxiWaitRemote
+038002c8 0000003c T pxiSendPacket
+03800304 00000024 t _keypadSendExtToArm9
+03800328 00000038 T keypadStartExtServer
+03800360 0000002a t _pmCallEventHandlers
+0380038c 00000024 T pmPrepareToReset
+038003b0 000000c8 t _pmPxiThreadMain
+03800478 0000001c t _pmResetPxiHandler
+03800494 00000002 W systemErrorExit
+03800498 000000c0 T pmInit
+03800558 0000002c T pmAddEventHandler
+03800584 00000014 T pmShouldReset
+03800598 00000010 T pmIsSleepAllowed
+038005a8 00000038 T pmSetSleepAllowed
+038005e0 00000030 T pmHasResetJumpTarget
+03800610 000000f2 T __syscall_exit
+03800704 000000de T pmEnterSleep
+038007e4 00000088 T pmMainLoop
+0380086c 00000010 t _rtcUpdateTask
+0380087c 000000b4 T rtcReadRegister
+03800930 000000b0 T rtcWriteRegister
+038009e0 00000094 T rtcInit
+03800a74 00000036 T rtcReadDateTime
+03800aac 00000060 T rtcDateTimeToUnix
+03800b0c 00000040 T rtcSyncTime
+03800b4c 00000030 t _pmicSpiBegin
+03800b7c 00000040 T pmicWriteRegister
+03800bbc 00000048 T pmicReadRegister
+03800c04 00000022 T pmicIssueShutdown
+03800c28 00000060 t _envValidateUserSettings
+03800c88 000000a6 t _envLoadUserSettings
+03800d30 00000020 T envReadNvramSettings
+03800d50 00000068 T pmGetBatteryState
+03800db8 00000034 T pmSetPowerLed
+03800dec 00000060 T pmMicSetAmp
+03800e4c 0000002c T pmReadNvram
+03800e78 00000028 T touchStartServer
+03800ea0 000000b4 T touchLoadCalibration
+03800f54 0000003c T touchInit
+03800f90 0000011c T touchRead
+038010ac 00000088 t _touchSrvThreadMain
+03801134 00000060 T blkInit
+03801194 00000046 T blkDevIsPresent
+038011dc 0000005e T blkDevInit
+0380123c 0000007a T blkDevReadSectors
+038012b8 0000007a T blkDevWriteSectors
+03801334 000000a2 t _blkPxiThread
+038013d8 00000024 t _wlmgrOnAssoc
+038013fc 00000018 t _wlmgrScanComplete
+03801414 0000003e t _wlmgrTxProcess
+03801454 00000020 t _wlmgrSetState
+03801474 00000038 t _wlmgrStop
+038014ac 00000038 t _wlmgrTxPxiHandler
+038014e4 0000002c t _wlmgrPmEventHandler
+03801510 000001cc t _wlmgrPxiProcessCmd.isra.0
+038016dc 0000007c t _wlmgrPxiProcess.constprop.0
+03801758 000000b4 t _wlmgrThreadMain
+0380180c 00000024 t _wlmgrCmdPxiHandler
+03801830 0000002c T _netbufRx
+0380185c 00000028 T wlmgrStartServer
+03801884 00000026 t _ntrwifiOnStateLost
+038018ac 0000002e t _ntrwifiOnScanEnd
+038018dc 0000004e t _ntrwifiOnAssocEnd
+0380192c 0000003a t _ntrwifiOnJoinEnd
+03801968 00000034 t _ntrwifiOnBssInfo
+0380199c 00000052 t _ntrwifiOnAuthEnd
+038019f0 00000020 t _ntrwifiRx
+03801a10 000000b4 T ntrwifiInit
+03801ac4 00000024 T ntrwifiExit
+03801ae8 00000038 T ntrwifiStartScan
+03801b20 0000002c T ntrwifiAssociate
+03801b4c 00000016 T ntrwifiDisassociate
+03801b62 00000028 T ntrwifiTx
+03801b8c 0000002c T _mwlBbpRead
+03801bb8 00000030 T _mwlBbpWrite
+03801be8 00000028 T _mwlRfCmd
+03801c10 0000002e t _mwlTaskHandler
+03801c40 00000064 t _mwlExitTask
+03801ca4 000000a6 T mwlDevStop
+03801d4c 0000022c T mwlDevStart
+03801f78 00000030 T mwlDevGracefulStop
+03801fa8 00000060 T _mwlPushTask
+03802008 00000094 T _mwlPopTask
+0380209c 000000e0 T _mwlIrqHandler
+0380217c 000000b6 T mwlDevWlanToDix
+03802234 000000cc T mwlDevDixToWlan
+03802300 00000018 t _mwlRxRead
+03802318 0000005c t _mwlRxProbeResFrame
+03802374 00000100 t _mwlRxBeaconFrame
+03802474 00000186 T _mwlRxEndTask
+038025fc 000000a2 T _mwlRxMgmtCtrlTask
+038026a0 00000042 T _mwlRxDataTask
+038026e4 00000030 T _mwlRxQueueClear
+03802714 00000034 t _mwlTxWrite
+03802748 00000182 t _mwlTxQueueKick
+038028cc 000000a2 T _mwlTxEndTask
+03802970 0000009e T _mwlTxQueueClear
+03802a10 00000048 T mwlDevTx
+03802a58 0000004a t _mwlSetMlmeState
+03802aa4 0000000e t _mwlMlmeAuthRaceWorkaround
+03802ab4 00000034 t _mwlMlmeScanTimeout
+03802ae8 0000000e t _mwlMlmeJoinTimeout
+03802af6 0000000e t _mwlMlmeAuthTimeout
+03802b04 0000000e t _mwlMlmeAssocTimeout
+03802b14 000000e6 t _mwlMlmeTaskScan
+03802bfc 0000002c t _mwlMlmeDeauthTxCb
+03802c28 00000046 T _mwlMlmeOnBssInfo
+03802c70 0000005c T _mwlMlmeHandleJoin
+03802ccc 000000ec T _mwlMlmeHandleAuth
+03802db8 0000001c T _mwlMlmeAuthFreeReply
+03802dd4 0000002c T _mwlMlmeHandleAssocResp
+03802e00 00000044 T _mwlMlmeHandleStateLoss
+03802e44 0000002c T _mwlMlmeBeaconLostTask
+03802e70 00000136 T _mwlMlmeTask
+03802fa8 00000008 T mwlMlmeGetCallbacks
+03802fb0 000000cc T mwlMlmeScan
+0380307c 000000b0 T mwlMlmeJoin
+0380312c 000000a4 T mwlMlmeAuthenticate
+038031d0 0000007c T mwlMlmeAssociate
+0380324c 00000050 T mwlMlmeDeauthenticate
+0380329c 00000034 T irqSet
+038032d0 0000001c t _tickCountIsr
+038032ec 00000070 T tickInit
+0380335c 0000004c T tickGetCount
+038033a8 00000044 t _tickTaskSchedule
+038033ec 00000076 t _tickTaskIsr
+03803464 0000007c T tickTaskStart
+038034e0 00000054 T tickTaskStop
+03803534 000000f4 t threadUpdateDynamicPrio
+03803628 000000c2 t threadRemoveWaiter
+038036ec 000000da T mutexLock
+038037c8 0000008a T mutexUnlock
+03803854 0000000c T __syscall_getreent
+03803860 00000028 T __syscall_lock_acquire_recursive
+03803888 00000016 T __syscall_lock_release_recursive
+038038a0 0000014c T __irq_handler
+038039ec 0000009a T netbufAlloc
+03803a88 00000046 T netbufFree
+03803ad0 00000080 t _wlanParseRsn
+03803b50 00000034 T wlanGetRateBit
+03803b84 00000058 T wlanFindOrAddBss
+03803bdc 00000054 T wlanFindRsnOrWpaIe
+03803c30 000001b4 T wlanParseBeacon
+03803de4 00000028 t _nvramSpiBegin
+03803e0c 00000050 T nvramWaitReady
+03803e5c 000000a0 T nvramReadDataBytes
+03803efc 00000054 t _tscPowerDownBetweenConversions
+03803f50 00000138 t _tscTryReadChannel
+03804088 0000002c t _tscDetectTouch
+038040b4 0000000c T tscInit
+038040c0 00000084 T tscReadTouch
+03804144 000000a4 T smutexLock
+038041e8 0000008c T smutexUnlock
+03804274 00000068 T operator new(unsigned int)
+038042dc 0000000c T std::bad_alloc::what() const
+038042e8 00000024 T std::bad_alloc::~bad_alloc()
+038042e8 00000024 T std::bad_alloc::~bad_alloc()
+0380430c 00000030 T std::bad_alloc::~bad_alloc()
+0380433c 00000010 T operator delete(void*, unsigned int)
+0380434c 0000000c W __gnu_cxx::__concurrence_lock_error::what() const
+03804358 0000000c W __gnu_cxx::__concurrence_unlock_error::what() const
+03804364 00000024 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
+03804364 00000024 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
+03804388 00000030 W __gnu_cxx::__concurrence_lock_error::~__concurrence_lock_error()
+038043b8 00000024 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
+038043b8 00000024 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
+038043dc 00000030 W __gnu_cxx::__concurrence_unlock_error::~__concurrence_unlock_error()
+0380440c 00000128 t (anonymous namespace)::pool::free(void*) [clone .constprop.0]
+03804534 000000f4 t (anonymous namespace)::pool::allocate(unsigned int) [clone .constprop.0]
+03804628 00000048 T __cxa_allocate_exception
+03804670 00000038 T __cxa_free_exception
+038046a8 00000004 T std::exception::~exception()
+038046a8 00000004 T std::exception::~exception()
+038046ac 00000004 T std::bad_exception::~bad_exception()
+038046ac 00000004 T std::bad_exception::~bad_exception()
+038046b0 0000000c T transaction clone for std::exception::what() const
+038046b0 0000000c T std::exception::what() const
+038046bc 0000000c T transaction clone for std::bad_exception::what() const
+038046bc 0000000c T std::bad_exception::what() const
+038046c8 00000024 T std::bad_exception::~bad_exception()
+038046ec 0000015c t read_encoded_value_with_base(unsigned char, unsigned int, unsigned char const*, unsigned int*)
+03804848 00000080 t base_of_encoded_value(unsigned char, _Unwind_Context*)
+038048c8 000000f4 t parse_lsda_header(_Unwind_Context*, unsigned char const*, lsda_header_info*)
+038049bc 000006f8 T __gxx_personality_v0
+038050b4 00000018 T __cxxabiv1::__terminate(void (*)())
+038050cc 00000074 T std::get_terminate()
+03805140 00000010 T __cxxabiv1::__unexpected(void (*)())
+03805150 00000074 T std::get_unexpected()
+038051c4 00000098 t __gxx_exception_cleanup(_Unwind_Reason_Code, _Unwind_Control_Block*)
+0380525c 00000074 T __cxa_init_primary_exception
+038052d0 00000054 T __cxa_throw
+03805324 000000b0 T __cxa_rethrow
+038053d4 00000074 T std::get_new_handler()
+03805448 00000024 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
+03805448 00000024 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
+0380546c 00000030 T __cxxabiv1::__si_class_type_info::~__si_class_type_info()
+0380549c 00000148 T __cxxabiv1::__si_class_type_info::__do_dyncast(int, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__dyncast_result&) const
+038055e4 0000008c T __cxxabiv1::__si_class_type_info::__do_find_public_src(int, void const*, __cxxabiv1::__class_type_info const*, void const*) const
+03805670 0000004c T __cxxabiv1::__si_class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__upcast_result&) const
+038056bc 00000004 T std::type_info::~type_info()
+038056bc 00000004 T std::type_info::~type_info()
+038056c0 00000008 T std::type_info::__is_pointer_p() const
+038056c0 00000008 T std::type_info::__is_function_p() const
+038056c8 000000f8 T __gnu_cxx::__exchange_and_add(int volatile*, int)
+038057c0 00000064 T __cxxabiv1::__class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void**) const
+03805824 00000014 T __cxxabiv1::__class_type_info::__do_find_public_src(int, void const*, __cxxabiv1::__class_type_info const*, void const*) const
+03805838 00000024 T __cxxabiv1::__class_type_info::~__class_type_info()
+03805838 00000024 T __cxxabiv1::__class_type_info::~__class_type_info()
+0380585c 00000030 T __cxxabiv1::__class_type_info::~__class_type_info()
+0380588c 00000078 T __cxxabiv1::__class_type_info::__do_upcast(__cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__upcast_result&) const
+03805904 00000098 T __cxxabiv1::__class_type_info::__do_catch(std::type_info const*, void**, unsigned int) const
+0380599c 00000100 T __cxxabiv1::__class_type_info::__do_dyncast(int, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__dyncast_result&) const
+03805a9c 00000010 T operator delete(void*)
+03805aac T __cxa_end_cleanup
+03805abc 00000144 T __cxa_type_match
+03805c00 000000bc T __cxa_begin_cleanup
+03805cbc 000000bc T __gnu_end_cleanup
+03805d78 000000e8 T __cxa_begin_catch
+03805e60 000000e0 T __cxa_end_catch
+03805f40 0000003c t eh_globals_dtor(void*)
+03805f7c 0000003c T __cxa_get_globals_fast
+03805fb8 00000094 T __cxa_get_globals
+0380604c 0000000c W __gnu_cxx::__concurrence_broadcast_error::what() const
+03806058 0000000c W __gnu_cxx::__concurrence_wait_error::what() const
+03806064 0000003c t (anonymous namespace)::init()
+038060a0 00000024 t (anonymous namespace)::init_static_cond()
+038060c4 00000024 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
+038060c4 00000024 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
+038060e8 00000030 W __gnu_cxx::__concurrence_wait_error::~__concurrence_wait_error()
+03806118 00000024 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
+03806118 00000024 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
+0380613c 00000030 W __gnu_cxx::__concurrence_broadcast_error::~__concurrence_broadcast_error()
+0380616c 000001b0 T __cxa_guard_acquire
+0380631c 000000e4 T __cxa_guard_release
+03806400 00000024 T __gnu_cxx::recursive_init_error::~recursive_init_error()
+03806400 00000024 T __gnu_cxx::recursive_init_error::~recursive_init_error()
+03806424 00000030 T __gnu_cxx::recursive_init_error::~recursive_init_error()
+03806454 00000010 T __gnu_cxx::recursive_init_error::recursive_init_error()
+03806454 00000010 T __gnu_cxx::recursive_init_error::recursive_init_error()
+03806464 00000012 T __gnu_thumb1_case_sqi
+03806478 00000012 T __gnu_thumb1_case_uqi
+0380648c T __aeabi_uidiv
+0380648c 000000f4 T __udivsi3
+0380648c t .udivsi3_skip_div0_test
+03806580 00000020 T __aeabi_uidivmod
+038065a0 T __aeabi_idiv
+038065a0 00000128 T __divsi3
+038065a8 t .divsi3_skip_div0_test
+038066c8 00000020 T __aeabi_idivmod
+038066e8 00000004 W __aeabi_idiv0
+038066e8 00000004 W __aeabi_ldiv0
+038066ec T __aeabi_uldivmod
+03806728 T __sync_synchronize
+03806728 00000004 T __sync_synchronize_none
+0380672c 00000018 T __aeabi_lmul
+0380672c 00000018 T __muldi3
+03806744 00000044 T __popcountsi2
+03806788 00000014 T __bswapsi2
+0380679c 00000140 T __udivmoddi4
+038068dc 00000018 t selfrel_offset31
+038068f4 00000098 t search_EIT_table
+0380698c 00000040 t __gnu_unwind_get_pr_addr
+038069cc 0000011c t get_eit_entry
+03806ae8 00000090 t restore_non_core_regs
+03806b78 00000014 t _Unwind_decode_typeinfo_ptr.constprop.0
+03806b8c 00000004 t _Unwind_DebugHook
+03806b90 00000068 t unwind_phase2
+03806bf8 00000150 t unwind_phase2_forced
+03806d48 000000ac T __gnu_Unwind_RaiseException
+03806df4 00000020 T __gnu_Unwind_ForcedUnwind
+03806e14 00000078 T __gnu_Unwind_Resume
+03806e8c 0000001c T __gnu_Unwind_Resume_or_Rethrow
+03806ea8 00000004 T _Unwind_Complete
+03806eac 00000018 T _Unwind_DeleteException
+03806ec4 00000064 T _Unwind_VRS_Get
+03806f28 00000030 t _Unwind_GetGR
+03806f58 00000064 T _Unwind_VRS_Set
+03806fbc 00000030 t _Unwind_SetGR
+03806fec 000000cc T __gnu_Unwind_Backtrace
+038070b8 00000418 t __gnu_unwind_pr_common
+038074d0 00000008 T __aeabi_unwind_cpp_pr0
+038074d8 00000008 W __aeabi_unwind_cpp_pr1
+038074e0 00000008 W __aeabi_unwind_cpp_pr2
+038074e8 00000464 T _Unwind_VRS_Pop
+0380794c 0000001c T __restore_core_regs
+0380794c 0000001c T restore_core_regs
+03807968 T __gnu_Unwind_Restore_VFP
+03807970 T __gnu_Unwind_Save_VFP
+03807978 T __gnu_Unwind_Restore_VFP_D
+03807980 T __gnu_Unwind_Save_VFP_D
+03807988 T __gnu_Unwind_Restore_VFP_D_16_to_31
+03807990 T __gnu_Unwind_Save_VFP_D_16_to_31
+03807998 T __gnu_Unwind_Restore_WMMXD
+038079dc T __gnu_Unwind_Save_WMMXD
+03807a20 T __gnu_Unwind_Restore_WMMXC
+03807a34 T __gnu_Unwind_Save_WMMXC
+03807a48 00000024 T ___Unwind_RaiseException
+03807a48 00000024 T _Unwind_RaiseException
+03807a6c 00000024 T ___Unwind_Resume
+03807a6c 00000024 T _Unwind_Resume
+03807a90 00000024 T ___Unwind_Resume_or_Rethrow
+03807a90 00000024 T _Unwind_Resume_or_Rethrow
+03807ab4 00000024 T ___Unwind_ForcedUnwind
+03807ab4 00000024 T _Unwind_ForcedUnwind
+03807ad8 00000024 T ___Unwind_Backtrace
+03807ad8 00000024 T _Unwind_Backtrace
+03807afc 00000060 t next_unwind_byte
+03807b5c 00000030 t _Unwind_GetGR.constprop.0
+03807b8c 00000004 t unwind_UCB_from_context
+03807b90 00000470 T __gnu_unwind_execute
+03808000 0000004c T __gnu_unwind_frame
+0380804c 00000014 T _Unwind_GetRegionStart
+03808060 00000020 T _Unwind_GetLanguageSpecificData
+03808080 00000028 T __clzdi2
+038080a8 00000048 T __clzsi2
+038080f0 00000144 T strchr
+03808234 00000028 T getenv
+0380825c 000000e0 T memcmp
+0380833c 000001f0 t _strtoul_l.isra.0
+0380852c 0000003c T strtoul
+03808568 00000014 T abort
+0380857c 00000048 T malloc
+038085c4 00000024 T free
+038085e8 000000f4 T memset
+038086dc 00000018 T __malloc_lock
+038086f4 00000018 T __malloc_unlock
+0380870c 00000224 T strcmp
+03808930 00000130 T memcpy
+03808a60 000000e0 T strncmp
+03808b40 00000020 T raise
+03808b60 00000018 T __env_lock
+03808b78 00000018 T __env_unlock
+03808b90 00000030 T __getreent
+03808bc0 00000020 T __libc_lock_acquire_recursive
+03808be0 00000020 T __libc_lock_release_recursive
+03808c00 0000000c t __pmMainLoop_from_arm
+03808c0c 00000008 t __twlNandInit_from_thumb
+03808c14 00000008 t __twlSdWriteSectors_from_thumb
+03808c1c 0000000c t __threadStart_from_arm
+03808c28 0000000c t __blkInit_from_arm
+03808c34 0000000c t __ntrwifiInit_from_arm
+03808c40 00000010 t __mwlDevReset_veneer
+03808c50 00000010 t ___mwlMgmtMakeAuth_veneer
+03808c60 00000008 t __memcpy_from_thumb
+03808c68 0000000c t ____syscall_lock_release_recursive_from_arm
+03808c74 00000010 t __mwlCalibLoad_veneer
+03808c84 00000008 t __twlNandReadSectors_from_thumb
+03808c8c 00000008 t __twlNandReadSectorsAes_from_thumb
+03808c94 0000000c t __pxiWaitForPing_from_arm
+03808ca0 00000010 t __mwlDevSetSsid_veneer
+03808cb0 00000010 t __mwlDevWakeUp_veneer
+03808cc0 00000008 t __twlSdInit_from_thumb
+03808cc8 0000000c t ____syscall_lock_acquire_recursive_from_arm
+03808cd4 0000000c t __pxiSendPacket_from_arm
+03808ce0 0000000c t __pmInit_from_arm
+03808cec 00000008 t __twlwifiTx_from_thumb
+03808cf4 0000000c t __ntrwifiDisassociate_from_arm
+03808d00 0000000c t ___wlmgrStop_from_arm
+03808d0c 0000000c t __rtcInit_from_arm
+03808d18 0000000c t __keypadStartExtServer_from_arm
+03808d24 00000010 t __mwlDevSetMode_veneer
+03808d34 0000000c t __threadIrqWait_from_arm
+03808d40 00000008 t __twlSdIsInserted_from_thumb
+03808d48 00000008 t ____aeabi_uldivmod_from_thumb
+03808d50 0000000c t __threadPrepare_from_arm
+03808d5c 00000008 t __memcmp_from_thumb
+03808d64 00000008 t __memset_from_thumb
+03808d6c 0000000c t __mailboxTryRecv_from_arm
+03808d78 00000010 t __mwlDevSetPreamble_veneer
+03808d88 00000010 t __mwlDevShutdown_veneer
+03808d98 0000000c t __touchInit_from_arm
+03808da4 00000010 t __mwlDevSetBssid_veneer
+03808db4 0000000c t __envReadNvramSettings_from_arm
+03808dc0 00000008 t __twlNandWriteSectorsAes_from_thumb
+03808dc8 0000000c t __pmSetSleepAllowed_from_arm
+03808dd4 00000008 t __twlwifiExit_from_thumb
+03808ddc 00000010 t __mwlDevSetAuth_veneer
+03808dec 0000000c t __rtcSyncTime_from_arm
+03808df8 0000000c t __wlmgrStartServer_from_arm
+03808e04 00000008 t __twlNandWriteSectors_from_thumb
+03808e0c 0000000c t ____syscall_getreent_from_arm
+03808e18 00000010 t ___mwlMgmtMakeAssocReq_veneer
+03808e28 00000008 t ___wlmgrPxiProcessCmd.isra.0_from_thumb
+03808e30 0000000c t __ntrwifiAssociate_from_arm
+03808e3c 0000000c t __pxiSetMailbox_from_arm
+03808e48 00000010 t ___mwlMgmtMakeProbeReq_veneer
+03808e58 0000000c t __ntrwifiStartScan_from_arm
+03808e64 00000008 t __twlSdReadSectors_from_thumb
+03808e6c 0000000c t ___wlmgrSetState_from_arm
+03808e78 00000010 t __mwlDevSetChannel_veneer
+03808e88 0000000c t __threadSleepTicks_from_arm
+03808e94 00000008 t ____aeabi_idiv_from_thumb
+03808e9c 00000010 t ___mwlMgmtMakeDeauth_veneer
+03808eac 00000008 t ____aeabi_lmul_from_thumb
+03808eb4 00000008 t __twlblkInit_from_thumb
+03808ebc 0000000c t __touchStartServer_from_arm
+03808f3e 00000018 t s_monthDayOffsets.0
+03808f5c 0000001c t s_mwlTaskHandlers
+03808f78 0000000c t s_wlanRates
+03809090 0000000d T typeinfo name for std::bad_alloc
+038090a0 0000000c T typeinfo for std::bad_alloc
+038090ac 00000014 T vtable for std::bad_alloc
+038090c0 00000027 V typeinfo name for __gnu_cxx::__concurrence_lock_error
+038090e8 0000000c V typeinfo for __gnu_cxx::__concurrence_lock_error
+038090f4 00000029 V typeinfo name for __gnu_cxx::__concurrence_unlock_error
+03809120 0000000c V typeinfo for __gnu_cxx::__concurrence_unlock_error
+0380912c 00000014 V vtable for __gnu_cxx::__concurrence_lock_error
+03809140 00000014 V vtable for __gnu_cxx::__concurrence_unlock_error
+03809154 0000000d T typeinfo name for std::exception
+03809164 00000008 T typeinfo for std::exception
+0380916c 00000012 T typeinfo name for std::bad_exception
+03809180 0000000c T typeinfo for std::bad_exception
+0380918c 00000020 T typeinfo name for __cxxabiv1::__forced_unwind
+038091ac 00000008 T typeinfo for __cxxabiv1::__forced_unwind
+038091b4 00000024 T typeinfo name for __cxxabiv1::__foreign_exception
+038091d8 00000008 T typeinfo for __cxxabiv1::__foreign_exception
+038091e0 00000014 T vtable for std::bad_exception
+03809208 00000025 T typeinfo name for __cxxabiv1::__si_class_type_info
+03809230 0000000c T typeinfo for __cxxabiv1::__si_class_type_info
+0380923c 0000002c T vtable for __cxxabiv1::__si_class_type_info
+03809268 0000000d T typeinfo name for std::type_info
+03809278 00000008 T typeinfo for std::type_info
+03809280 00000022 T typeinfo name for __cxxabiv1::__class_type_info
+038092a4 0000000c T typeinfo for __cxxabiv1::__class_type_info
+038092b0 0000002c T vtable for __cxxabiv1::__class_type_info
+038092dc 0000002c V typeinfo name for __gnu_cxx::__concurrence_broadcast_error
+03809308 0000000c V typeinfo for __gnu_cxx::__concurrence_broadcast_error
+03809314 00000027 V typeinfo name for __gnu_cxx::__concurrence_wait_error
+0380933c 0000000c V typeinfo for __gnu_cxx::__concurrence_wait_error
+03809348 00000014 V vtable for __gnu_cxx::__concurrence_broadcast_error
+0380935c 00000014 V vtable for __gnu_cxx::__concurrence_wait_error
+03809370 00000023 T typeinfo name for __gnu_cxx::recursive_init_error
+03809394 0000000c T typeinfo for __gnu_cxx::recursive_init_error
+038093a0 00000014 T vtable for __gnu_cxx::recursive_init_error
+038093cc 00000101 T _ctype_
+038094d0 00000004 D __cxxabiv1::__unexpected_handler
+038094d4 00000004 D __cxxabiv1::__terminate_handler
+038094d8 00000004 D __malloc_sbrk_base
+038094dc 00000004 D __malloc_trim_threshold
+038094e0 00000408 D __malloc_av_
+038098e8 00000004 D environ
+038098ec 00000004 D _impure_ptr
+038098f0 d __wram_end
+038098f0 b completed.1
+038098f4 b object.0
+0380990c 00000200 b (anonymous namespace)::s_audioMailboxSlots
+03809b0c 00000008 b (anonymous namespace)::s_audioMailbox
+03809b18 00001000 b (anonymous namespace)::s_audioThreadStack
+0380ab18 00000070 b (anonymous namespace)::s_audioThread
+0380ab88 00001438 b (anonymous namespace)::s_acp
+0380bfc0 00000008 b s_sleepThreads
+0380bfc8 00000008 b s_joinThreads
+0380bfd0 00000070 b s_idleThread
+0380c040 00000070 b s_mainThread
+0380c0b0 00000100 B __irq_table
+0380c1b0 00000024 B __sched_state
+0380c1d4 00000008 b s_mailboxRecvQueue
+0380c1dc 000001f0 b s_pxiChannels
+0380c3cc 00000004 b s_pxiRecvState
+0380c3d0 00000008 b s_pxiRecvQueue
+0380c3d8 00000004 b s_pxiSendMutex
+0380c3dc 00000010 b s_keypadTask
+0380c3f0 00000200 b s_pmPxiThreadStack
+0380c5f0 00000070 b s_pmPxiThread
+0380c660 0000000c b s_pmState
+0380c66c 00000010 b s_rtcUpdateTask
+0380c67c 00000004 b s_rtcMutex
+0380c680 00000004 B g_spiMutex
+0380c688 00000100 b s_touchSrvThreadStack
+0380c788 00000070 b s_touchSrvThread
+0380c7f8 0000001c b s_touchState
+0380c818 00000400 b s_blkPxiThreadStack
+0380cc18 00000070 b s_blkPxiThread
+0380cc88 00000020 b s_blkPxiMailboxData
+0380cca8 00000008 b s_blkPxiMailbox
+0380ccb0 00000001 b s_blkHasTwl
+0380ccb4 00000004 b s_dldiDiscIface
+0380ccb8 00000020 b s_wlmgrState
+0380ccd8 00000800 b s_wlmgrThreadStack
+0380d4d8 00000070 b s_wlmgrThread
+0380d548 0000000c b s_assocVars
+0380d554 00000010 b s_scanVars
+0380d568 00000600 b s_mwlThreadStack
+0380db68 00000070 b s_mwlThread
+0380dbd8 00000100 B s_mwlState
+0380dcd8 00000008 b s_mwlTaskQueue
+0380dce0 00000420 b s_mwlRxStaticMem
+0380e100 00000004 b s_firstTask
+0380e108 00000008 b s_highTickCount
+0380e110 00000001 b s_tickInit
+0380e111 00000001 B g_cdcIsTwlMode
+0380e112 00000001 B g_isTwlMode
+0380e113 00000001 b touching.0
+0380e114 00000008 b s_smutexWaitList
+0380e120 0000001c b (anonymous namespace)::emergency_pool
+0380e140 00000010 b (anonymous namespace)::mx
+0380e150 00000004 b (anonymous namespace)::__new_handler
+0380e158 00000010 b (anonymous namespace)::mx
+0380e168 00000004 b guard variable for (anonymous namespace)::get_atomic_mutex()::atomic_mutex
+0380e170 00000010 b (anonymous namespace)::get_atomic_mutex()::atomic_mutex
+0380e180 00000004 b init
+0380e184 00000001 B __eh_globals_init::_S_init
+0380e188 0000000c b (anonymous namespace)::eh_globals
+0380e194 00000004 b (anonymous namespace)::get_static_cond()::once
+0380e198 00000008 b (anonymous namespace)::fake_cond
+0380e1a0 00000004 b (anonymous namespace)::static_cond
+0380e1a4 00000004 b (anonymous namespace)::get_static_mutex()::once
+0380e1a8 00000010 b (anonymous namespace)::fake_mutex
+0380e1b8 00000004 b (anonymous namespace)::static_mutex
+0380e1bc 00000028 B __malloc_current_mallinfo
+0380e1e4 00000004 B __malloc_max_total_mem
+0380e1e8 00000004 B __malloc_max_sbrked_mem
+0380e1ec 00000004 B __malloc_top_pad
+0380e1f0 0000000c b __malloc_recursive_mutex
+0380e1fc 0000000c b __env_recursive_mutex
+0380e208 00000004 b initial_env
+0380e20c 00000004 B fake_heap_start
+0380e210 00000004 B fake_heap_end
+0380e214 00000004 b heap_start.0
+0380e218 00000168 B __sf
+0380e380 00000004 B __stdio_exit_handler
+0380e384 b __wram_bss_end
 0380f000 t __sys_start
 0380fe80 a __sp_usr
 0380ff80 a __sp_irq

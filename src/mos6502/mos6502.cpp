@@ -79,7 +79,7 @@ static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
 }
 
 struct NDSRomDecodeEntry {
-	uint32_t epoch;
+	uint32_t tag;  // (epoch << 16) | (pc & ~0x1FF) for validation
 	uint8_t opcode;
 	uint8_t op1;
 	uint8_t op2;
@@ -91,7 +91,9 @@ struct NDSRomDecodeEntry {
 	const uint8_t* abs_ptr;
 };
 
-static NDSRomDecodeEntry g_nds_rom_decode[0x8000];
+// Cache size tuned for real games: 2048 entries = 64KB
+// Direct-mapped: index by PC, tag includes high bits + epoch
+static NDSRomDecodeEntry g_nds_rom_decode[2048];
 
 enum NDSAbsReadMode : uint8_t {
 	NDS_ABS_READ_RAM = 0,
@@ -127,10 +129,11 @@ static inline uint8_t NDSClassifyAbsReadMode(uint16_t address)
 
 static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 {
-	NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FFF];
+	NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
 	const uint32_t epoch = cached_rom_decode_epoch;
-	if (UNLIKELY(entry.epoch != epoch)) {
-		entry.epoch = epoch;
+	const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+	if (UNLIKELY(entry.tag != expected_tag)) {
+		entry.tag = expected_tag;
 		if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 		if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
 		if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
@@ -1740,10 +1743,11 @@ td_op_slow:
 			if (LIKELY(Sync == NULL)) {
 				if (LIKELY(opcode == 0xAD)) { // LDA ABS - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FFF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					if (UNLIKELY(entry.epoch != epoch)) {
-						entry.epoch = epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
 						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
@@ -1793,10 +1797,11 @@ td_op_slow:
 
 						} else if (LIKELY(opcode == 0xD0)) { // BNE REL - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FFF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					if (UNLIKELY(entry.epoch != epoch)) {
-						entry.epoch = epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
 						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
@@ -1831,6 +1836,81 @@ td_op_slow:
 					} else {
 						elapsedCycles = 2;
 					}
+					handledHot = true;
+				} else if (LIKELY(opcode == 0xA5)) { // LDA ZER - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						entry.op2 = 0;
+						entry.abs = entry.op1;
+						entry.abs_read_mode = NDS_ABS_READ_RAM; // ZER always reads from RAM
+						entry.abs_ptr = nullptr;
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+					}
+					A = cached_ram_ptr[entry.op1];
+					SetNZFast(A);
+					pc = (uint16_t)(pc + 1);
+					elapsedCycles = 3;
+					handledHot = true;
+				} else if (LIKELY(opcode == 0x8D)) { // STA ABS - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+						switch (entry.abs_read_mode) {
+							case NDS_ABS_READ_ROM_LO:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_VIA:
+								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+								break;
+							default:
+								entry.abs_ptr = nullptr;
+								break;
+						}
+					}
+					const uint16_t addr = entry.abs;
+					if (LIKELY(addr < 0x2000)) {
+						cached_ram_ptr[addr] = A;
+					} else if (addr & 0x4000) {
+						FlushRunCycles();
+						VDMA_Write(addr, A);
+					} else if ((addr >= 0x3000) && (addr <= 0x3FFF)) {
+						GT_AudioRamWrite(addr, A);
+					} else if ((addr >= 0x2800) && (addr <= 0x2FFF)) {
+						const uint8_t viaReg = (uint8_t)(addr & 0xF);
+						if ((loadedRomType == RomType::FLASH2M) && (viaReg == 0x1)) {
+							UpdateFlashShiftRegister(A);
+						}
+						system_state.VIA_regs[viaReg] = A;
+					}
+					pc = (uint16_t)(pc + 2);
+					elapsedCycles = 4;
 					handledHot = true;
 				}
 			}
