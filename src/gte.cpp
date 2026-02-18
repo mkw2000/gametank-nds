@@ -318,7 +318,7 @@ uint8_t open_bus() {
 }
 
 uint8_t VDMA_Read(uint16_t address) {
-	if (blitter->IsBusy() || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
+	if ((blitter && blitter->IsBusy()) || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
 		blitter->CatchUp();
 	}
 	if(system_state.dma_control & DMA_COPY_ENABLE_BIT) {
@@ -340,7 +340,7 @@ uint8_t VDMA_Read(uint16_t address) {
 }
 
 void VDMA_Write(uint16_t address, uint8_t value) {
-	if (blitter->IsBusy() || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
+	if ((blitter && blitter->IsBusy()) || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
 		blitter->CatchUp();
 	}
 	if(system_state.dma_control & DMA_COPY_ENABLE_BIT) {
@@ -658,7 +658,7 @@ void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 			system_state.VIA_regs[address & 0xF] = value;
 		} else {
 			if((address & 0x000F) == 0x0007) {
-				if (blitter->IsBusy()) {
+				if (blitter && blitter->IsBusy()) {
 					blitter->CatchUp();
 				}
 				if((value & DMA_VID_OUT_PAGE_BIT) != (system_state.dma_control & DMA_VID_OUT_PAGE_BIT)) {
@@ -683,7 +683,7 @@ void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 				}
 #endif
 			} else if((address & 0x000F) == 0x0005) {
-				if (blitter->IsBusy()) {
+				if (blitter && blitter->IsBusy()) {
 					blitter->CatchUp();
 				}
 				system_state.banking = value;
@@ -1948,7 +1948,7 @@ EM_BOOL mainloop(double time, void* userdata) {
 #ifdef NDS_BUILD
 		uint32_t tBlit = cpuGetTiming();
 #endif
-		if (blitter->IsBusy()) {
+		if (blitter && blitter->IsBusy()) {
 			blitter->CatchUp();
 		}
 #ifdef NDS_BUILD
