@@ -1679,7 +1679,7 @@ td_op_slow:
 				case 0x69: { // ADC IMM
 					uint8_t imm;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						imm = dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1726,7 +1726,7 @@ td_op_slow:
 					uint16_t lo;
 					uint16_t hi;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						lo = dec.op1;
 						hi = dec.op2;
@@ -1756,7 +1756,7 @@ td_op_slow:
 				case 0xA9: { // LDA IMM
 					uint8_t imm;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						imm = dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1800,7 +1800,7 @@ td_op_slow:
 				case 0x49: { // EOR IMM
 					uint8_t imm;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						imm = dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1815,7 +1815,7 @@ td_op_slow:
 				case 0xE9: { // SBC IMM
 					uint8_t imm;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						imm = dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1861,7 +1861,7 @@ td_op_slow:
 				case 0xB0: { // BCS REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1882,7 +1882,7 @@ td_op_slow:
 				case 0x90: { // BCC REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1903,7 +1903,7 @@ td_op_slow:
 				case 0xF0: { // BEQ REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1924,7 +1924,7 @@ td_op_slow:
 				case 0x10: { // BPL REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1945,7 +1945,7 @@ td_op_slow:
 				case 0x30: { // BMI REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1966,7 +1966,7 @@ td_op_slow:
 				case 0x50: { // BVC REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -1987,7 +1987,7 @@ td_op_slow:
 				case 0x70: { // BVS REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -2008,7 +2008,7 @@ td_op_slow:
 				case 0x80: { // BRA REL
 					int8_t off8;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off8 = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
@@ -2027,14 +2027,14 @@ td_op_slow:
 				case 0xD0: { // BNE REL
 					int8_t off;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						off = (int8_t)dec.op1;
 						pc = (uint16_t)(pc + 1);
 					} else {
 						off = (int8_t)FetchByte();
 					}
-					if (!IF_ZERO()) {
+					if ((status & ZERO) == 0) {
 						const uint16_t oldPc = pc;
 						pc = (uint16_t)(pc + off);
 						elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
@@ -2047,7 +2047,7 @@ td_op_slow:
 					uint16_t lo;
 					uint16_t hi;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						lo = dec.op1;
 						hi = dec.op2;
@@ -2082,7 +2082,7 @@ td_op_slow:
 					uint16_t lo;
 					uint16_t hi;
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						lo = dec.op1;
 						hi = dec.op2;
