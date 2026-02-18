@@ -16,6 +16,12 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
+#if defined(NDS_BUILD) && defined(ARM9) && defined(__GNUC__)
+#define NDS_USE_THREADED_DISPATCH 1
+#else
+#define NDS_USE_THREADED_DISPATCH 0
+#endif
+
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
 extern CartridgeState cartridge_state;
@@ -1466,6 +1472,51 @@ void mos6502::Run(
 
 		// Direct opcode dispatch on ARM9 avoids per-instruction member function pointer indirection.
 #if defined(NDS_BUILD) && defined(ARM9)
+#if NDS_USE_THREADED_DISPATCH
+		static void* threadedDispatch[256] = {};
+		static uint8_t threadedDispatchInit = 0;
+		if (UNLIKELY(threadedDispatchInit == 0)) {
+			for (int i = 0; i < 256; ++i) threadedDispatch[i] = &&td_op_slow;
+			threadedDispatch[0xAD] = &&td_op_AD; // LDA ABS
+			threadedDispatch[0xD0] = &&td_op_D0; // BNE REL
+			threadedDispatch[0x20] = &&td_op_20; // JSR ABS
+			threadedDispatchInit = 1;
+		}
+		goto *threadedDispatch[opcode];
+
+td_op_AD: {
+			const uint16_t lo = FetchByte();
+			const uint16_t hi = FetchByte();
+			A = ReadBus((uint16_t)(lo | (hi << 8)));
+			SetNZFast(A);
+			elapsedCycles = 4;
+			goto td_op_done;
+		}
+td_op_D0: {
+			uint16_t off = (uint16_t)FetchByte();
+			if (off & 0x80) off |= 0xFF00;
+			const uint16_t target = pc + (int16_t)off;
+			if (!IF_ZERO()) {
+				if (!addressesSamePage(pc, target)) opExtraCycles++;
+				pc = target;
+				opExtraCycles++;
+			}
+			elapsedCycles = 2;
+			goto td_op_done;
+		}
+td_op_20: {
+			const uint16_t lo = FetchByte();
+			const uint16_t hi = FetchByte();
+			const uint16_t target = (uint16_t)(lo | (hi << 8));
+			pc--;
+			StackPush((pc >> 8) & 0xFF);
+			StackPush(pc & 0xFF);
+			pc = target;
+			elapsedCycles = 6;
+			goto td_op_done;
+		}
+td_op_slow:
+#endif
 		switch(opcode) {
 			case 0xAD: { // LDA ABS
 				const uint16_t lo = FetchByte();
@@ -1662,6 +1713,9 @@ void mos6502::Run(
 				break;
 			}
 		}
+#if NDS_USE_THREADED_DISPATCH
+td_op_done:
+#endif
 #else
 		instr = InstrTable[opcode];
 		Exec(instr);
