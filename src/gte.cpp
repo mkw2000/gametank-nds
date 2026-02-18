@@ -1347,6 +1347,12 @@ static void NDSPerfMaybePrint() {
 			}
 		}
 	}
+	const uint8_t stPaused = paused ? 1u : 0u;
+	const uint8_t stWaiting = (cpu_core && cpu_core->waiting) ? 1u : 0u;
+	const uint8_t stFreeze = (cpu_core && cpu_core->freeze) ? 1u : 0u;
+	const uint8_t stIllegal = (cpu_core && cpu_core->illegalOpcode) ? 1u : 0u;
+	const uint16_t stPc = cpu_core ? cpu_core->pc : 0u;
+	const uint8_t stIllegalOp = cpu_core ? cpu_core->illegalOpcodeSrc : 0u;
 
 	// Keep output on a dedicated block of lines on the sub-screen console.
 	// Keep each line <= 32 chars to avoid wrap/scroll corruption.
@@ -1360,6 +1366,13 @@ static void NDSPerfMaybePrint() {
 		(unsigned long)renderPct,
 		(unsigned long)audioPct,
 		(unsigned long)inputPct);
+	printf("S:P%uW%uF%uL%u PC:%04X I:%02X \n",
+		(unsigned int)stPaused,
+		(unsigned int)stWaiting,
+		(unsigned int)stFreeze,
+		(unsigned int)stIllegal,
+		(unsigned int)stPc,
+		(unsigned int)stIllegalOp);
 	if (opcodeDeltaTotal > 0 && topOpCycles[0] > 0) {
 		const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / opcodeDeltaTotal);
 		const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / opcodeDeltaTotal);
@@ -1390,6 +1403,13 @@ static void NDSPerfMaybePrint() {
 				(unsigned long)renderPct,
 				(unsigned long)audioPct,
 				(unsigned long)inputPct);
+			fprintf(f, "S:P%uW%uF%uL%u PC:%04X I:%02X\n",
+				(unsigned int)stPaused,
+				(unsigned int)stWaiting,
+				(unsigned int)stFreeze,
+				(unsigned int)stIllegal,
+				(unsigned int)stPc,
+				(unsigned int)stIllegalOp);
 			if (opcodeDeltaTotal > 0 && topOpCycles[0] > 0) {
 				const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / opcodeDeltaTotal);
 				const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / opcodeDeltaTotal);

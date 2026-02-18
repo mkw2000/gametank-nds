@@ -1896,6 +1896,7 @@ td_op_slow:
 					}
 					const uint16_t addr = entry.abs;
 					if (LIKELY(addr < 0x2000)) {
+						cached_ram_init_ptr[addr] = true;
 						cached_ram_ptr[addr] = A;
 					} else if (addr & 0x4000) {
 						FlushRunCycles();
@@ -1908,6 +1909,10 @@ td_op_slow:
 							UpdateFlashShiftRegister(A);
 						}
 						system_state.VIA_regs[viaReg] = A;
+					} else {
+						// Keep full bus semantics for control I/O (e.g. $2007 DMA control)
+						// and any non-fast-mapped ranges.
+						WriteBus(addr, A);
 					}
 					pc = (uint16_t)(pc + 2);
 					elapsedCycles = 4;
