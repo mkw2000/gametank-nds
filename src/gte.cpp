@@ -1238,6 +1238,48 @@ static NDSPerfStats ndsPerf;
 static uint32_t ndsLastOpcodeExec[256] = {0};
 static uint64_t ndsLastOpcodeCycles[256] = {0};
 #define NDS_PERF_PRINT_INTERVAL_FRAMES 180
+#define NDS_PERF_LOG_PATH_PRIMARY "fat:/gametank_perf.log"
+#define NDS_PERF_LOG_PATH_FALLBACK "sd:/gametank_perf.log"
+
+struct NDSPerfLogState {
+	bool enabled = false;
+	bool writeFailed = false;
+	char path[32] = {0};
+};
+
+static NDSPerfLogState ndsPerfLog;
+
+static void NDSPerfInitLogging(bool storageReady) {
+	ndsPerfLog.enabled = false;
+	ndsPerfLog.writeFailed = false;
+	ndsPerfLog.path[0] = '\0';
+	if (!storageReady) return;
+
+	const char* candidates[] = {
+		NDS_PERF_LOG_PATH_PRIMARY,
+		NDS_PERF_LOG_PATH_FALLBACK
+	};
+
+	FILE* f = nullptr;
+	for (unsigned int i = 0; i < (sizeof(candidates) / sizeof(candidates[0])); ++i) {
+		f = fopen(candidates[i], "a");
+		if (f) {
+			strncpy(ndsPerfLog.path, candidates[i], sizeof(ndsPerfLog.path) - 1);
+			ndsPerfLog.path[sizeof(ndsPerfLog.path) - 1] = '\0';
+			break;
+		}
+	}
+
+	if (!f) {
+		printf("Perf log disabled (open failed)\n");
+		return;
+	}
+
+	fprintf(f, "\n--- perf session start ---\n");
+	fclose(f);
+	ndsPerfLog.enabled = true;
+	printf("Perf log: %s\n", ndsPerfLog.path);
+}
 
 static void NDSPerfMaybePrint() {
 	if (!ndsPerf.enabled || ndsMenuOpen) {
@@ -1333,6 +1375,42 @@ static void NDSPerfMaybePrint() {
 	} else {
 		printf("OP:--/-- --/-- --/--        \n");
 		printf("EX:    0/    0/    0         \n");
+	}
+
+	if (ndsPerfLog.enabled) {
+		FILE* f = fopen(ndsPerfLog.path, "a");
+		if (f) {
+			fprintf(f, "F:%8llu P:%5luus RT:%3lu%%\n",
+				(unsigned long long)ndsPerf.frames,
+				(unsigned long)avgUs,
+				(unsigned long)speedPct);
+			fprintf(f, "C:%2lu B:%2lu R:%2lu A:%2lu I:%2lu\n",
+				(unsigned long)cpuPct,
+				(unsigned long)blitPct,
+				(unsigned long)renderPct,
+				(unsigned long)audioPct,
+				(unsigned long)inputPct);
+			if (opcodeDeltaTotal > 0 && topOpCycles[0] > 0) {
+				const uint32_t p0 = (uint32_t)((topOpCycles[0] * 100ULL) / opcodeDeltaTotal);
+				const uint32_t p1 = (uint32_t)((topOpCycles[1] * 100ULL) / opcodeDeltaTotal);
+				const uint32_t p2 = (uint32_t)((topOpCycles[2] * 100ULL) / opcodeDeltaTotal);
+				fprintf(f, "OP:%02X/%2lu %02X/%2lu %02X/%2lu\n",
+					(unsigned int)topOps[0], (unsigned long)p0,
+					(unsigned int)topOps[1], (unsigned long)p1,
+					(unsigned int)topOps[2], (unsigned long)p2);
+				fprintf(f, "EX:%5lu/%5lu/%5lu\n\n",
+					(unsigned long)(topOpExec[0] > 99999 ? 99999 : topOpExec[0]),
+					(unsigned long)(topOpExec[1] > 99999 ? 99999 : topOpExec[1]),
+					(unsigned long)(topOpExec[2] > 99999 ? 99999 : topOpExec[2]));
+			} else {
+				fprintf(f, "OP:--/-- --/-- --/--\n");
+				fprintf(f, "EX:    0/    0/    0\n\n");
+			}
+			fclose(f);
+		} else if (!ndsPerfLog.writeFailed) {
+			ndsPerfLog.writeFailed = true;
+			printf("Perf log write failed\n");
+		}
 	}
 }
 
@@ -2233,13 +2311,15 @@ int main(int argC, char* argV[]) {
 		printf("GameTank Emulator - NDS\n");
 
 		// Initialize libfat for SD card access
-		if (!fatInitDefault()) {
+		const bool storageReady = fatInitDefault();
+		if (!storageReady) {
 			printf("SD card init failed!\n");
 			// Emulator fallback: avoid blocking PXI audio startup when ARM7 side isn't ready.
 			// On real hardware with a working card this path won't run.
 			EmulatorConfig::noSound = true;
 			printf("Audio disabled (no SD/libfat)\n");
 		}
+		NDSPerfInitLogging(storageReady);
 
 	// Clear DS top screen VRAM to black
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
