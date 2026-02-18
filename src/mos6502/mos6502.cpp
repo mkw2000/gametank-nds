@@ -1424,6 +1424,18 @@ void mos6502::Run(
 	uint8_t elapsedCycles;
 #if defined(NDS_BUILD) && defined(ARM9)
 	uint16_t src = 0;
+#if NDS_USE_THREADED_DISPATCH
+	static void* threadedDispatch[256] = {};
+	static uint8_t threadedDispatchInit = 0;
+	if (UNLIKELY(threadedDispatchInit == 0)) {
+		for (int i = 0; i < 256; ++i) threadedDispatch[i] = &&td_op_slow;
+		threadedDispatch[0xAD] = &&td_op_AD; // LDA ABS
+		threadedDispatch[0xD0] = &&td_op_D0; // BNE REL
+		threadedDispatch[0x20] = &&td_op_20; // JSR ABS
+		threadedDispatch[0xEE] = &&td_op_EE; // INC ABS
+		threadedDispatchInit = 1;
+	}
+#endif
 #else
 	Instr instr;
 #endif
@@ -1473,15 +1485,6 @@ void mos6502::Run(
 		// Direct opcode dispatch on ARM9 avoids per-instruction member function pointer indirection.
 #if defined(NDS_BUILD) && defined(ARM9)
 #if NDS_USE_THREADED_DISPATCH
-		static void* threadedDispatch[256] = {};
-		static uint8_t threadedDispatchInit = 0;
-		if (UNLIKELY(threadedDispatchInit == 0)) {
-			for (int i = 0; i < 256; ++i) threadedDispatch[i] = &&td_op_slow;
-			threadedDispatch[0xAD] = &&td_op_AD; // LDA ABS
-			threadedDispatch[0xD0] = &&td_op_D0; // BNE REL
-			threadedDispatch[0x20] = &&td_op_20; // JSR ABS
-			threadedDispatchInit = 1;
-		}
 		goto *threadedDispatch[opcode];
 
 td_op_AD: {
@@ -1512,6 +1515,17 @@ td_op_20: {
 			StackPush((pc >> 8) & 0xFF);
 			StackPush(pc & 0xFF);
 			pc = target;
+			elapsedCycles = 6;
+			goto td_op_done;
+		}
+td_op_EE: {
+			const uint16_t lo = FetchByte();
+			const uint16_t hi = FetchByte();
+			const uint16_t addr = (uint16_t)(lo | (hi << 8));
+			uint8_t m = ReadBus(addr);
+			m = (uint8_t)(m + 1);
+			SetNZFast(m);
+			WriteBus(addr, m);
 			elapsedCycles = 6;
 			goto td_op_done;
 		}
@@ -1703,6 +1717,17 @@ td_op_slow:
 				status |= CONSTANT;
 				status &= ~BREAK;
 				elapsedCycles = 4;
+				break;
+			}
+			case 0xEE: { // INC ABS
+				const uint16_t lo = FetchByte();
+				const uint16_t hi = FetchByte();
+				const uint16_t addr = (uint16_t)(lo | (hi << 8));
+				uint8_t m = ReadBus(addr);
+				m = (uint8_t)(m + 1);
+				SetNZFast(m);
+				WriteBus(addr, m);
+				elapsedCycles = 6;
 				break;
 			}
 #include "mos6502_dispatch_cases.inc"
