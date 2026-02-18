@@ -23,6 +23,13 @@ extern SystemState system_state;
 extern CartridgeState cartridge_state;
 extern RomType loadedRomType;
 extern uint16_t cached_ram_base;
+extern uint8_t open_bus();
+extern uint8_t VDMA_Read(uint16_t address);
+extern void VDMA_Write(uint16_t address, uint8_t value);
+extern void UpdateFlashShiftRegister(uint8_t nextVal);
+extern "C" uint8_t GT_AudioRamRead(uint16_t address);
+extern "C" void GT_AudioRamWrite(uint16_t address, uint8_t value);
+extern "C" uint8_t GT_JoystickReadFast(uint8_t portNum);
 
 #ifndef NDS_OPCODE_PROFILE_STRIDE
 #define NDS_OPCODE_PROFILE_STRIDE 4u
@@ -1020,7 +1027,9 @@ mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
 inline uint8_t mos6502::ReadBus(uint16_t address)
 {
 #if defined(NDS_BUILD) && defined(ARM9)
-	// Hot path: most CPU accesses are ROM fetches or RAM reads.
+	// GameTank map fast path:
+	// 0000-1FFF: RAM, 2008/2009: controller, 2800-2FFF: VIA mirror,
+	// 3000-3FFF: audio RAM, 4000-7FFF: VDMA, 8000-FFFF: cart ROM/flash.
 	if(address & 0x8000) {
 		switch(loadedRomType) {
 			case RomType::FLASH2M:
@@ -1043,6 +1052,21 @@ inline uint8_t mos6502::ReadBus(uint16_t address)
 	if(address < 0x2000) {
 		return system_state.ram[cached_ram_base | address];
 	}
+	if(address & 0x4000) {
+		// VDMA reads are time-coupled with blitter state.
+		FlushRunCycles();
+		return VDMA_Read(address);
+	}
+	if((address >= 0x3000) && (address <= 0x3FFF)) {
+		return GT_AudioRamRead(address);
+	}
+	if((address >= 0x2800) && (address <= 0x2FFF)) {
+		return system_state.VIA_regs[address & 0xF];
+	}
+	if((address == 0x2008) || (address == 0x2009)) {
+		return GT_JoystickReadFast((uint8_t)address);
+	}
+	return open_bus();
 #endif
 	FlushRunCycles();
 	return (*Read)(address);
@@ -1055,6 +1079,25 @@ inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 		const uint16_t idx = (uint16_t)(cached_ram_base | address);
 		system_state.ram_initialized[idx] = true;
 		system_state.ram[idx] = value;
+		return;
+	}
+	if(address & 0x4000) {
+		// VDMA writes are time-coupled with blitter state.
+		FlushRunCycles();
+		VDMA_Write(address, value);
+		return;
+	}
+	if((address >= 0x3000) && (address <= 0x3FFF)) {
+		GT_AudioRamWrite(address, value);
+		return;
+	}
+	if((address >= 0x2800) && (address <= 0x2FFF)) {
+		const uint8_t viaReg = (uint8_t)(address & 0xF);
+		// VIA_ORA drives flash serial signals on FLASH2M hardware.
+		if((loadedRomType == RomType::FLASH2M) && (viaReg == 0x1)) {
+			UpdateFlashShiftRegister(value);
+		}
+		system_state.VIA_regs[viaReg] = value;
 		return;
 	}
 #endif

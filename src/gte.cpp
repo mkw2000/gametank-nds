@@ -120,6 +120,18 @@ mos6502 *cpu_core;
 Blitter *blitter;
 AudioCoprocessor *soundcard;
 JoystickAdapter *joysticks;
+
+extern "C" uint8_t ITCM_CODE GT_AudioRamRead(uint16_t address) {
+	return soundcard->ram_read(address);
+}
+
+extern "C" void ITCM_CODE GT_AudioRamWrite(uint16_t address, uint8_t value) {
+	soundcard->ram_write(address, value);
+}
+
+extern "C" uint8_t ITCM_CODE GT_JoystickReadFast(uint8_t portNum) {
+	return joysticks->read(portNum, true);
+}
 SystemState system_state;
 CartridgeState cartridge_state;
 
