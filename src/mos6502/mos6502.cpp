@@ -1736,7 +1736,54 @@ td_op_20: {
 		}
 td_op_slow:
 #endif
-			switch(opcode) {
+			bool handledHot = false;
+			if (LIKELY(Sync == NULL)) {
+				if (LIKELY(opcode == 0xAD)) { // LDA ABS
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+					const uint16_t addr = dec.abs;
+					const uint8_t* const absPtr = dec.abs_ptr;
+					uint8_t m;
+					if (LIKELY(absPtr != nullptr)) {
+						m = *absPtr;
+					} else {
+						switch (dec.abs_read_mode) {
+							case NDS_ABS_READ_RAM:
+								m = cached_ram_ptr[addr];
+								break;
+							case NDS_ABS_READ_AUDIO:
+								m = GT_AudioRamRead(addr);
+								break;
+							case NDS_ABS_READ_JOY:
+								m = GT_JoystickReadFast((uint8_t)addr);
+								break;
+							case NDS_ABS_READ_OPEN_BUS:
+								m = open_bus();
+								break;
+							default:
+								m = ReadBus(addr);
+								break;
+						}
+					}
+					pc = (uint16_t)(pc + 2);
+					A = m;
+					SetNZFast(A);
+					elapsedCycles = 4;
+					handledHot = true;
+				} else if (LIKELY(opcode == 0xD0)) { // BNE REL
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+					pc = (uint16_t)(opPc + 2);
+					if ((status & ZERO) == 0) {
+						pc = dec.rel_target;
+						elapsedCycles = dec.rel_taken_cycles;
+					} else {
+						elapsedCycles = 2;
+					}
+					handledHot = true;
+				}
+			}
+			if (!handledHot) switch(opcode) {
 				case 0x69: { // ADC IMM
 					uint8_t imm;
 					const uint16_t opPc = (uint16_t)(pc - 1);
