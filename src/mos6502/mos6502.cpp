@@ -16,7 +16,7 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 
-#define NDS_USE_THREADED_DISPATCH 0
+#define NDS_USE_THREADED_DISPATCH 1
 
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
@@ -1739,6 +1739,7 @@ td_op_20: {
 		}
 td_op_slow:
 #endif
+			{ // scope for handledHot (threaded dispatch gotos skip this)
 			bool handledHot = false;
 			if (LIKELY(Sync == NULL)) {
 				if (LIKELY(opcode == 0xAD)) { // LDA ABS - fully inlined
@@ -2367,6 +2368,7 @@ td_op_slow:
 				break;
 			}
 		}
+		} // end handledHot scope
 #if NDS_USE_THREADED_DISPATCH
 td_op_done:
 #endif
