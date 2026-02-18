@@ -318,7 +318,7 @@ uint8_t open_bus() {
 }
 
 uint8_t VDMA_Read(uint16_t address) {
-	if ((blitter && blitter->IsBusy()) || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
+	if (blitter && (blitter->IsBusy() || (system_state.dma_control & DMA_COPY_ENABLE_BIT))) {
 		blitter->CatchUp();
 	}
 	if(system_state.dma_control & DMA_COPY_ENABLE_BIT) {
@@ -333,18 +333,21 @@ uint8_t VDMA_Read(uint16_t address) {
 			}
 		} else {
 			bufPtr = system_state.gram;
-			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
+			const uint8_t gramMidBits = blitter ? blitter->gram_mid_bits : 0;
+			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | gramMidBits) << 14;
 		}
 		return bufPtr[(address & 0x3FFF) | offset];
 	}
 }
 
 void VDMA_Write(uint16_t address, uint8_t value) {
-	if ((blitter && blitter->IsBusy()) || (system_state.dma_control & DMA_COPY_ENABLE_BIT)) {
+	if (blitter && (blitter->IsBusy() || (system_state.dma_control & DMA_COPY_ENABLE_BIT))) {
 		blitter->CatchUp();
 	}
 	if(system_state.dma_control & DMA_COPY_ENABLE_BIT) {
-		blitter->SetParam(address, value);
+		if (blitter) {
+			blitter->SetParam(address, value);
+		}
 	} else {
 		uint8_t* bufPtr;
 		uint32_t offset = 0;
@@ -365,11 +368,12 @@ void VDMA_Write(uint16_t address, uint8_t value) {
 			}
 		} else {
 			bufPtr = system_state.gram;
+			const uint8_t gramMidBits = blitter ? blitter->gram_mid_bits : 0;
 #ifndef NDS_BUILD
 			targetSurface = gRAM_Surface;
-			yShift = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) * GT_HEIGHT;
+			yShift = (((system_state.banking & BANK_GRAM_MASK) << 2) | gramMidBits) * GT_HEIGHT;
 #endif
-			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | (blitter->gram_mid_bits)) << 14;
+			offset = (((system_state.banking & BANK_GRAM_MASK) << 2) | gramMidBits) << 14;
 		}
 		uint32_t writeIndex = (address & 0x3FFF) | offset;
 		bufPtr[writeIndex] = value;
