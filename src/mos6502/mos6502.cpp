@@ -34,6 +34,40 @@ extern "C" uint8_t GT_JoystickReadFast(uint8_t portNum);
 #ifndef NDS_OPCODE_PROFILE_STRIDE
 #define NDS_OPCODE_PROFILE_STRIDE 4u
 #endif
+
+static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
+{
+	if(address & 0x8000) {
+		switch(loadedRomType) {
+			case RomType::FLASH2M:
+				if(address & 0x4000) out = cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
+				else out = cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+				return true;
+			case RomType::FLASH2M_RAM32K:
+				if(address & 0x4000) {
+					out = cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
+				} else if(!(cartridge_state.bank_mask & 0x80)) {
+					out = cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
+				} else {
+					out = cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+				}
+				return true;
+			case RomType::EEPROM32K:
+				out = cartridge_state.rom[address & 0x7FFF];
+				return true;
+			case RomType::EEPROM8K:
+				out = cartridge_state.rom[address & 0x1FFF];
+				return true;
+			default:
+				return false;
+		}
+	}
+	if(address < 0x2000) {
+		out = system_state.ram[cached_ram_base | address];
+		return true;
+	}
+	return false;
+}
 #endif
 
 mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
@@ -1566,14 +1600,20 @@ td_op_slow:
 			case 0xAD: { // LDA ABS
 				const uint16_t lo = FetchByte();
 				const uint16_t hi = FetchByte();
-				A = ReadBus((uint16_t)(lo | (hi << 8)));
+				const uint16_t addr = (uint16_t)(lo | (hi << 8));
+				uint8_t m;
+				if (LIKELY(NDSMainReadFast(addr, m))) {
+					A = m;
+				} else {
+					A = ReadBus(addr);
+				}
 				SetNZFast(A);
 				elapsedCycles = 4;
 				break;
 			}
 			case 0xA5: { // LDA ZER
 				const uint16_t addr = FetchByte();
-				A = ReadBus(addr);
+				A = system_state.ram[cached_ram_base | addr];
 				SetNZFast(A);
 				elapsedCycles = 3;
 				break;
@@ -1593,14 +1633,23 @@ td_op_slow:
 			}
 			case 0x85: { // STA ZER
 				const uint16_t addr = FetchByte();
-				WriteBus(addr, A);
+				const uint16_t idx = (uint16_t)(cached_ram_base | addr);
+				system_state.ram_initialized[idx] = true;
+				system_state.ram[idx] = A;
 				elapsedCycles = 3;
 				break;
 			}
 			case 0xB2: { // LDA ZPI
 				const uint8_t zp = FetchByte();
-				const uint16_t addr = (uint16_t)(ReadBus(zp) | (ReadBus((uint8_t)(zp + 1)) << 8));
-				A = ReadBus(addr);
+				const uint16_t addr = (uint16_t)(
+					system_state.ram[cached_ram_base | zp] |
+					(system_state.ram[cached_ram_base | (uint8_t)(zp + 1)] << 8));
+				uint8_t m;
+				if (LIKELY(NDSMainReadFast(addr, m))) {
+					A = m;
+				} else {
+					A = ReadBus(addr);
+				}
 				SetNZFast(A);
 				elapsedCycles = 5;
 				break;
@@ -1747,10 +1796,24 @@ td_op_slow:
 				const uint16_t lo = FetchByte();
 				const uint16_t hi = FetchByte();
 				const uint16_t addr = (uint16_t)(lo | (hi << 8));
-				uint8_t m = ReadBus(addr);
-				m = (uint8_t)(m + 1);
-				SetNZFast(m);
-				WriteBus(addr, m);
+				if (LIKELY(addr < 0x2000)) {
+					const uint16_t idx = (uint16_t)(cached_ram_base | addr);
+					uint8_t m = (uint8_t)(system_state.ram[idx] + 1);
+					system_state.ram_initialized[idx] = true;
+					system_state.ram[idx] = m;
+					SetNZFast(m);
+				} else {
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						m = (uint8_t)(m + 1);
+						SetNZFast(m);
+						WriteBus(addr, m);
+					} else {
+						m = (uint8_t)(ReadBus(addr) + 1);
+						SetNZFast(m);
+						WriteBus(addr, m);
+					}
+				}
 				elapsedCycles = 6;
 				break;
 			}
