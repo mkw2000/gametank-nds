@@ -20,9 +20,13 @@
 
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
-extern CartridgeState cartridge_state;
 extern RomType loadedRomType;
-extern uint16_t cached_ram_base;
+extern uint8_t* cached_ram_ptr;
+extern bool* cached_ram_init_ptr;
+extern uint8_t* cached_rom_lo_ptr;
+extern uint8_t* cached_rom_hi_ptr;
+extern uint16_t cached_rom_linear_mask;
+extern uint32_t cached_rom_decode_epoch;
 extern uint8_t open_bus();
 extern uint8_t VDMA_Read(uint16_t address);
 extern void VDMA_Write(uint16_t address, uint8_t value);
@@ -32,41 +36,52 @@ extern "C" void GT_AudioRamWrite(uint16_t address, uint8_t value);
 extern "C" uint8_t GT_JoystickReadFast(uint8_t portNum);
 
 #ifndef NDS_OPCODE_PROFILE_STRIDE
-#define NDS_OPCODE_PROFILE_STRIDE 4u
+#define NDS_OPCODE_PROFILE_STRIDE 16u
 #endif
 
 static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
 {
 	if(address & 0x8000) {
-		switch(loadedRomType) {
-			case RomType::FLASH2M:
-				if(address & 0x4000) out = cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-				else out = cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
-				return true;
-			case RomType::FLASH2M_RAM32K:
-				if(address & 0x4000) {
-					out = cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-				} else if(!(cartridge_state.bank_mask & 0x80)) {
-					out = cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
-				} else {
-					out = cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
-				}
-				return true;
-			case RomType::EEPROM32K:
-				out = cartridge_state.rom[address & 0x7FFF];
-				return true;
-			case RomType::EEPROM8K:
-				out = cartridge_state.rom[address & 0x1FFF];
-				return true;
-			default:
-				return false;
+		const RomType romType = loadedRomType;
+		if (LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
+			out = (address & 0x4000)
+				? cached_rom_hi_ptr[address & 0x3FFF]
+				: cached_rom_lo_ptr[address & 0x3FFF];
+			return true;
 		}
+		if ((romType == RomType::EEPROM32K) || (romType == RomType::EEPROM8K)) {
+			out = cached_rom_lo_ptr[address & cached_rom_linear_mask];
+			return true;
+		}
+		return false;
 	}
 	if(address < 0x2000) {
-		out = system_state.ram[cached_ram_base | address];
+		out = cached_ram_ptr[address];
 		return true;
 	}
 	return false;
+}
+
+struct NDSRomDecodeEntry {
+	uint32_t epoch;
+	uint8_t opcode;
+	uint8_t op1;
+	uint8_t op2;
+};
+
+static NDSRomDecodeEntry g_nds_rom_decode[0x8000];
+
+static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
+{
+	NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FFF];
+	const uint32_t epoch = cached_rom_decode_epoch;
+	if (UNLIKELY(entry.epoch != epoch)) {
+		entry.epoch = epoch;
+		if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+		if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+		if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+	}
+	return entry;
 }
 #endif
 
@@ -1066,26 +1081,18 @@ inline uint8_t mos6502::ReadBus(uint16_t address)
 	// 0000-1FFF: RAM, 2008/2009: controller, 2800-2FFF: VIA mirror,
 	// 3000-3FFF: audio RAM, 4000-7FFF: VDMA, 8000-FFFF: cart ROM/flash.
 	if(address & 0x8000) {
-		switch(loadedRomType) {
-			case RomType::FLASH2M:
-				if(address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-				return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
-			case RomType::FLASH2M_RAM32K:
-				if(address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-				if(!(cartridge_state.bank_mask & 0x80)) {
-					return cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
-				}
-				return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
-			case RomType::EEPROM32K:
-				return cartridge_state.rom[address & 0x7FFF];
-			case RomType::EEPROM8K:
-				return cartridge_state.rom[address & 0x1FFF];
-			default:
-				break;
+		const RomType romType = loadedRomType;
+		if (LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
+			return (address & 0x4000)
+				? cached_rom_hi_ptr[address & 0x3FFF]
+				: cached_rom_lo_ptr[address & 0x3FFF];
+		}
+		if ((romType == RomType::EEPROM32K) || (romType == RomType::EEPROM8K)) {
+			return cached_rom_lo_ptr[address & cached_rom_linear_mask];
 		}
 	}
 	if(address < 0x2000) {
-		return system_state.ram[cached_ram_base | address];
+		return cached_ram_ptr[address];
 	}
 	if(address & 0x4000) {
 		// VDMA reads are time-coupled with blitter state.
@@ -1113,9 +1120,8 @@ inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 #if defined(NDS_BUILD) && defined(ARM9)
 	if (LIKELY(Sync == NULL)) {
 	if(address < 0x2000) {
-		const uint16_t idx = (uint16_t)(cached_ram_base | address);
-		system_state.ram_initialized[idx] = true;
-		system_state.ram[idx] = value;
+		cached_ram_init_ptr[address] = true;
+		cached_ram_ptr[address] = value;
 		return;
 	}
 	if(address & 0x4000) {
@@ -1150,24 +1156,20 @@ inline uint8_t mos6502::FetchByte()
 	if (LIKELY(Sync == NULL)) {
 	// Instruction stream is usually ROM; keep this path as lean as possible.
 	if (address & 0x8000) {
-		if (loadedRomType == RomType::FLASH2M) {
-			if (address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-			return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+		const RomType romType = loadedRomType;
+		if (LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
+			return (address & 0x4000)
+				? cached_rom_hi_ptr[address & 0x3FFF]
+				: cached_rom_lo_ptr[address & 0x3FFF];
 		}
-		if (loadedRomType == RomType::FLASH2M_RAM32K) {
-			if (address & 0x4000) return cartridge_state.rom[0x1FC000 | (address & 0x3FFF)];
-			if(!(cartridge_state.bank_mask & 0x80)) {
-				return cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
-			}
-			return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+		if ((romType == RomType::EEPROM32K) || (romType == RomType::EEPROM8K)) {
+			return cached_rom_lo_ptr[address & cached_rom_linear_mask];
 		}
-		if (loadedRomType == RomType::EEPROM32K) return cartridge_state.rom[address & 0x7FFF];
-		if (loadedRomType == RomType::EEPROM8K) return cartridge_state.rom[address & 0x1FFF];
 	}
 
-	if (address < 0x2000) {
-		return system_state.ram[cached_ram_base | address];
-	}
+		if (address < 0x2000) {
+			return cached_ram_ptr[address];
+		}
 	}
 #endif
 	return ReadBus(address);
@@ -1178,6 +1180,51 @@ inline void mos6502::SetNZFast(uint8_t value)
 	status = (status & (uint8_t)~(NEGATIVE | ZERO)) |
 		(uint8_t)(value & NEGATIVE) |
 		(uint8_t)((value == 0) ? ZERO : 0);
+}
+
+inline void mos6502::ADCFast(uint8_t m)
+{
+	const unsigned int carryIn = IF_CARRY() ? 1u : 0u;
+	unsigned int tmp = m + A + carryIn;
+	SET_ZERO(!(tmp & 0xFF));
+	if (IF_DECIMAL())
+	{
+		opExtraCycles += 1;
+		if (((A & 0xF) + (m & 0xF) + carryIn) > 9) tmp += 6;
+		SET_NEGATIVE(tmp & 0x80);
+		SET_OVERFLOW(!((A ^ m) & 0x80) && ((A ^ tmp) & 0x80));
+		if (tmp > 0x99) {
+			tmp += 96;
+		}
+		SET_CARRY(tmp > 0x99);
+	}
+	else
+	{
+		SET_NEGATIVE(tmp & 0x80);
+		SET_OVERFLOW(!((A ^ m) & 0x80) && ((A ^ tmp) & 0x80));
+		SET_CARRY(tmp > 0xFF);
+	}
+	A = (uint8_t)(tmp & 0xFF);
+}
+
+inline void mos6502::SBCFast(uint8_t m)
+{
+	const unsigned int borrowIn = IF_CARRY() ? 0u : 1u;
+	unsigned int tmp = A - m - borrowIn;
+	SET_NEGATIVE(tmp & 0x80);
+	SET_ZERO(!(tmp & 0xFF));
+	SET_OVERFLOW(((A ^ tmp) & 0x80) && ((A ^ m) & 0x80));
+
+	if (IF_DECIMAL())
+	{
+		opExtraCycles += 1;
+		if (((A & 0x0F) - borrowIn) < (m & 0x0F)) tmp -= 6;
+		if (tmp > 0x99) {
+			tmp -= 0x60;
+		}
+	}
+	SET_CARRY(tmp < 0x100);
+	A = (uint8_t)(tmp & 0xFF);
 }
 
 inline void mos6502::FlushRunCycles()
@@ -1212,8 +1259,8 @@ uint16_t ITCM_CODE mos6502::Addr_ABS()
 	uint16_t addrH;
 	uint16_t addr;
 
-	addrL = ReadBus(pc++);
-	addrH = ReadBus(pc++);
+	addrL = FetchByte();
+	addrH = FetchByte();
 
 	addr = addrL + (addrH << 8);
 
@@ -1222,7 +1269,7 @@ uint16_t ITCM_CODE mos6502::Addr_ABS()
 
 uint16_t ITCM_CODE mos6502::Addr_ZER()
 {
-	return ReadBus(pc++);
+	return FetchByte();
 }
 
 uint16_t ITCM_CODE mos6502::Addr_IMP()
@@ -1235,7 +1282,7 @@ uint16_t ITCM_CODE mos6502::Addr_REL()
 	uint16_t offset;
 	uint16_t addr;
 
-	offset = (uint16_t)ReadBus(pc++);
+	offset = (uint16_t)FetchByte();
 	if (offset & 0x80) offset |= 0xFF00;
 	addr = pc + (int16_t)offset;
 
@@ -1251,8 +1298,8 @@ uint16_t ITCM_CODE mos6502::Addr_ABI()
 	uint16_t abs;
 	uint16_t addr;
 
-	addrL = ReadBus(pc++);
-	addrH = ReadBus(pc++);
+	addrL = FetchByte();
+	addrH = FetchByte();
 
 	abs = (addrH << 8) | addrL;
 
@@ -1278,8 +1325,8 @@ uint16_t ITCM_CODE mos6502::Addr_AIX()
 	uint16_t abs;
 	uint16_t addr;
 
-	addrL = ReadBus(pc++);
-	addrH = ReadBus(pc++);
+	addrL = FetchByte();
+	addrH = FetchByte();
 
 	// Offset the calculated absolute address by X
 	abs = ((addrH << 8) | addrL) + X;
@@ -1300,13 +1347,13 @@ uint16_t ITCM_CODE mos6502::Addr_AIX()
 
 uint16_t ITCM_CODE mos6502::Addr_ZEX()
 {
-	uint16_t addr = (ReadBus(pc++) + X) % 256;
+	uint16_t addr = (FetchByte() + X) % 256;
 	return addr;
 }
 
 uint16_t ITCM_CODE mos6502::Addr_ZEY()
 {
-	uint16_t addr = (ReadBus(pc++) + Y) % 256;
+	uint16_t addr = (FetchByte() + Y) % 256;
 	return addr;
 }
 
@@ -1317,8 +1364,8 @@ uint16_t ITCM_CODE mos6502::Addr_ABX()
 	uint16_t addrL;
 	uint16_t addrH;
 
-	addrL = ReadBus(pc++);
-	addrH = ReadBus(pc++);
+	addrL = FetchByte();
+	addrH = FetchByte();
 
 	addrBase = addrL + (addrH << 8);
 	addr = addrBase + X;
@@ -1336,8 +1383,8 @@ uint16_t ITCM_CODE mos6502::Addr_ABY()
 	uint16_t addrL;
 	uint16_t addrH;
 
-	addrL = ReadBus(pc++);
-	addrH = ReadBus(pc++);
+	addrL = FetchByte();
+	addrH = FetchByte();
 
 	addrBase = addrL + (addrH << 8);
 	addr = addrBase + Y;
@@ -1355,7 +1402,7 @@ uint16_t ITCM_CODE mos6502::Addr_INX()
 	uint16_t zeroH;
 	uint16_t addr;
 
-	zeroL = (ReadBus(pc++) + X) % 256;
+	zeroL = (FetchByte() + X) % 256;
 	zeroH = (zeroL + 1) % 256;
 	addr = ReadBus(zeroL) + (ReadBus(zeroH) << 8);
 
@@ -1369,7 +1416,7 @@ uint16_t ITCM_CODE mos6502::Addr_INY()
 	uint16_t addr;
 	uint16_t addrBase;
 
-	zeroL = ReadBus(pc++);
+	zeroL = FetchByte();
 	zeroH = (zeroL + 1) % 256;
 	addrBase = ReadBus(zeroL) + (ReadBus(zeroH) << 8);
 	addr = addrBase + Y;
@@ -1386,7 +1433,7 @@ uint16_t ITCM_CODE mos6502::Addr_ZPI()
 	uint16_t zeroH;
 	uint16_t addr;
 
-	zeroL = ReadBus(pc++);
+	zeroL = FetchByte();
 	zeroH = (zeroL + 1) % 256;
 	addr = ReadBus(zeroL) + (ReadBus(zeroH) << 8);
 
@@ -1572,15 +1619,14 @@ td_op_AD: {
 			goto td_op_done;
 		}
 td_op_D0: {
-			uint16_t off = (uint16_t)FetchByte();
-			if (off & 0x80) off |= 0xFF00;
-			const uint16_t target = pc + (int16_t)off;
+			const int8_t off = (int8_t)FetchByte();
 			if (!IF_ZERO()) {
-				if (!addressesSamePage(pc, target)) opExtraCycles++;
-				pc = target;
-				opExtraCycles++;
+				const uint16_t oldPc = pc;
+				pc = (uint16_t)(pc + off);
+				elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
+			} else {
+				elapsedCycles = 2;
 			}
-			elapsedCycles = 2;
 			goto td_op_done;
 		}
 td_op_20: {
@@ -1596,227 +1642,336 @@ td_op_20: {
 		}
 td_op_slow:
 #endif
-		switch(opcode) {
-			case 0xAD: { // LDA ABS
-				const uint16_t lo = FetchByte();
-				const uint16_t hi = FetchByte();
-				const uint16_t addr = (uint16_t)(lo | (hi << 8));
-				uint8_t m;
-				if (LIKELY(NDSMainReadFast(addr, m))) {
-					A = m;
-				} else {
-					A = ReadBus(addr);
+			switch(opcode) {
+				case 0x69: { // ADC IMM
+					ADCFast(FetchByte());
+					elapsedCycles = 2;
+					break;
 				}
-				SetNZFast(A);
-				elapsedCycles = 4;
-				break;
-			}
-			case 0xA5: { // LDA ZER
-				const uint16_t addr = FetchByte();
-				A = system_state.ram[cached_ram_base | addr];
-				SetNZFast(A);
-				elapsedCycles = 3;
-				break;
-			}
-			case 0xA9: { // LDA IMM
-				A = FetchByte();
-				SetNZFast(A);
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x8D: { // STA ABS
-				const uint16_t lo = FetchByte();
-				const uint16_t hi = FetchByte();
-				WriteBus((uint16_t)(lo | (hi << 8)), A);
-				elapsedCycles = 4;
-				break;
-			}
-			case 0x85: { // STA ZER
-				const uint16_t addr = FetchByte();
-				const uint16_t idx = (uint16_t)(cached_ram_base | addr);
-				system_state.ram_initialized[idx] = true;
-				system_state.ram[idx] = A;
-				elapsedCycles = 3;
-				break;
-			}
-			case 0xB2: { // LDA ZPI
-				const uint8_t zp = FetchByte();
-				const uint16_t addr = (uint16_t)(
-					system_state.ram[cached_ram_base | zp] |
-					(system_state.ram[cached_ram_base | (uint8_t)(zp + 1)] << 8));
-				uint8_t m;
-				if (LIKELY(NDSMainReadFast(addr, m))) {
-					A = m;
-				} else {
-					A = ReadBus(addr);
+				case 0x65: { // ADC ZER
+					ADCFast(cached_ram_ptr[FetchByte()]);
+					elapsedCycles = 3;
+					break;
 				}
-				SetNZFast(A);
-				elapsedCycles = 5;
-				break;
-			}
-			case 0x49: { // EOR IMM
-				A ^= FetchByte();
-				SetNZFast(A);
-				elapsedCycles = 2;
-				break;
-			}
-			case 0xB0: { // BCS REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (IF_CARRY()) {
+				case 0x6D: { // ADC ABS
+					const uint16_t lo = FetchByte();
+					const uint16_t hi = FetchByte();
+					const uint16_t addr = (uint16_t)(lo | (hi << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						ADCFast(m);
+					} else {
+						ADCFast(ReadBus(addr));
+					}
+					elapsedCycles = 4;
+					break;
+				}
+				case 0x72: { // ADC ZPI
+					const uint8_t zp = FetchByte();
+					const uint16_t addr = (uint16_t)(
+						cached_ram_ptr[zp] |
+						(cached_ram_ptr[(uint8_t)(zp + 1)] << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						ADCFast(m);
+					} else {
+						ADCFast(ReadBus(addr));
+					}
+					elapsedCycles = 6;
+					break;
+				}
+				case 0xAD: { // LDA ABS
+					uint16_t lo;
+					uint16_t hi;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						lo = dec.op1;
+						hi = dec.op2;
+						pc = (uint16_t)(pc + 2);
+					} else {
+						lo = FetchByte();
+						hi = FetchByte();
+					}
+					const uint16_t addr = (uint16_t)(lo | (hi << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						A = m;
+					} else {
+						A = ReadBus(addr);
+					}
+					SetNZFast(A);
+					elapsedCycles = 4;
+					break;
+				}
+				case 0xA5: { // LDA ZER
+					const uint16_t addr = FetchByte();
+					A = cached_ram_ptr[addr];
+					SetNZFast(A);
+					elapsedCycles = 3;
+					break;
+				}
+				case 0xA9: { // LDA IMM
+					A = FetchByte();
+					SetNZFast(A);
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x8D: { // STA ABS
+					const uint16_t lo = FetchByte();
+					const uint16_t hi = FetchByte();
+					WriteBus((uint16_t)(lo | (hi << 8)), A);
+					elapsedCycles = 4;
+					break;
+				}
+				case 0x85: { // STA ZER
+					const uint16_t addr = FetchByte();
+					cached_ram_init_ptr[addr] = true;
+					cached_ram_ptr[addr] = A;
+					elapsedCycles = 3;
+					break;
+				}
+				case 0xB2: { // LDA ZPI
+					const uint8_t zp = FetchByte();
+					const uint16_t addr = (uint16_t)(
+						cached_ram_ptr[zp] |
+						(cached_ram_ptr[(uint8_t)(zp + 1)] << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						A = m;
+					} else {
+						A = ReadBus(addr);
+					}
+					SetNZFast(A);
+					elapsedCycles = 5;
+					break;
+				}
+				case 0x49: { // EOR IMM
+					A ^= FetchByte();
+					SetNZFast(A);
+					elapsedCycles = 2;
+					break;
+				}
+				case 0xE9: { // SBC IMM
+					SBCFast(FetchByte());
+					elapsedCycles = 2;
+					break;
+				}
+				case 0xE5: { // SBC ZER
+					SBCFast(cached_ram_ptr[FetchByte()]);
+					elapsedCycles = 3;
+					break;
+				}
+				case 0xED: { // SBC ABS
+					const uint16_t lo = FetchByte();
+					const uint16_t hi = FetchByte();
+					const uint16_t addr = (uint16_t)(lo | (hi << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						SBCFast(m);
+					} else {
+						SBCFast(ReadBus(addr));
+					}
+					elapsedCycles = 4;
+					break;
+				}
+				case 0xF2: { // SBC ZPI
+					const uint8_t zp = FetchByte();
+					const uint16_t addr = (uint16_t)(
+						cached_ram_ptr[zp] |
+						(cached_ram_ptr[(uint8_t)(zp + 1)] << 8));
+					uint8_t m;
+					if (LIKELY(NDSMainReadFast(addr, m))) {
+						SBCFast(m);
+					} else {
+						SBCFast(ReadBus(addr));
+					}
+					elapsedCycles = 5;
+					break;
+				}
+				case 0xB0: { // BCS REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (IF_CARRY()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x90: { // BCC REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (!IF_CARRY()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0xF0: { // BEQ REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (IF_ZERO()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x10: { // BPL REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (!IF_NEGATIVE()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x30: { // BMI REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (IF_NEGATIVE()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x50: { // BVC REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (!IF_OVERFLOW()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x70: { // BVS REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
+					if (IF_OVERFLOW()) {
+						if (!addressesSamePage(pc, target)) opExtraCycles++;
+						pc = target;
+						opExtraCycles++;
+					}
+					elapsedCycles = 2;
+					break;
+				}
+				case 0x80: { // BRA REL
+					uint16_t off = (uint16_t)FetchByte();
+					if (off & 0x80) off |= 0xFF00;
+					const uint16_t target = pc + (int16_t)off;
 					if (!addressesSamePage(pc, target)) opExtraCycles++;
 					pc = target;
 					opExtraCycles++;
+					elapsedCycles = 3;
+					break;
 				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x90: { // BCC REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (!IF_CARRY()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
+				case 0xD0: { // BNE REL
+					int8_t off;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off = (int8_t)FetchByte();
+					}
+					if (!IF_ZERO()) {
+						const uint16_t oldPc = pc;
+						pc = (uint16_t)(pc + off);
+						elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
+					} else {
+						elapsedCycles = 2;
+					}
+					break;
 				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0xF0: { // BEQ REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (IF_ZERO()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x10: { // BPL REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (!IF_NEGATIVE()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x30: { // BMI REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (IF_NEGATIVE()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x50: { // BVC REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (!IF_OVERFLOW()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x70: { // BVS REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (IF_OVERFLOW()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x80: { // BRA REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (!addressesSamePage(pc, target)) opExtraCycles++;
-				pc = target;
-				opExtraCycles++;
-				elapsedCycles = 3;
-				break;
-			}
-			case 0xD0: { // BNE REL
-				uint16_t off = (uint16_t)FetchByte();
-				if (off & 0x80) off |= 0xFF00;
-				const uint16_t target = pc + (int16_t)off;
-				if (!IF_ZERO()) {
-					if (!addressesSamePage(pc, target)) opExtraCycles++;
-					pc = target;
-					opExtraCycles++;
-				}
-				elapsedCycles = 2;
-				break;
-			}
-			case 0x20: { // JSR ABS
-				const uint16_t lo = FetchByte();
-				const uint16_t hi = FetchByte();
-				const uint16_t target = (uint16_t)(lo | (hi << 8));
+				case 0x20: { // JSR ABS
+					uint16_t lo;
+					uint16_t hi;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						lo = dec.op1;
+						hi = dec.op2;
+						pc = (uint16_t)(pc + 2);
+					} else {
+						lo = FetchByte();
+						hi = FetchByte();
+					}
+					const uint16_t target = (uint16_t)(lo | (hi << 8));
 				pc--;
 				StackPush((pc >> 8) & 0xFF);
 				StackPush(pc & 0xFF);
 				pc = target;
-				elapsedCycles = 6;
-				break;
-			}
-			case 0x4C: { // JMP ABS
-				const uint16_t lo = FetchByte();
-				const uint16_t hi = FetchByte();
-				pc = (uint16_t)(lo | (hi << 8));
-				elapsedCycles = 3;
-				break;
-			}
-			case 0x60: { // RTS
-				const uint16_t lo = StackPop();
-				const uint16_t hi = StackPop();
-				pc = (uint16_t)((hi << 8) | lo);
-				pc++;
-				elapsedCycles = 6;
-				break;
-			}
-			case 0xEE: { // INC ABS
-				const uint16_t lo = FetchByte();
-				const uint16_t hi = FetchByte();
-				const uint16_t addr = (uint16_t)(lo | (hi << 8));
-				if (LIKELY(addr < 0x2000)) {
-					const uint16_t idx = (uint16_t)(cached_ram_base | addr);
-					uint8_t m = (uint8_t)(system_state.ram[idx] + 1);
-					system_state.ram_initialized[idx] = true;
-					system_state.ram[idx] = m;
-					SetNZFast(m);
-				} else {
-					uint8_t m;
-					if (LIKELY(NDSMainReadFast(addr, m))) {
-						m = (uint8_t)(m + 1);
-						SetNZFast(m);
-						WriteBus(addr, m);
-					} else {
-						m = (uint8_t)(ReadBus(addr) + 1);
-						SetNZFast(m);
-						WriteBus(addr, m);
-					}
+					elapsedCycles = 6;
+					break;
 				}
-				elapsedCycles = 6;
-				break;
-			}
+				case 0x4C: { // JMP ABS
+					uint16_t lo;
+					uint16_t hi;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFD)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						lo = dec.op1;
+						hi = dec.op2;
+						pc = (uint16_t)(pc + 2);
+					} else {
+						lo = FetchByte();
+						hi = FetchByte();
+					}
+					pc = (uint16_t)(lo | (hi << 8));
+					elapsedCycles = 3;
+					break;
+				}
+				case 0x60: { // RTS
+					const uint16_t lo = StackPop();
+					const uint16_t hi = StackPop();
+					pc = (uint16_t)((hi << 8) | lo);
+				pc++;
+					elapsedCycles = 6;
+					break;
+				}
+				case 0xEE: { // INC ABS
+					const uint16_t lo = FetchByte();
+					const uint16_t hi = FetchByte();
+					const uint16_t addr = (uint16_t)(lo | (hi << 8));
+					if (LIKELY(addr < 0x2000)) {
+						uint8_t m = (uint8_t)(cached_ram_ptr[addr] + 1);
+						cached_ram_init_ptr[addr] = true;
+						cached_ram_ptr[addr] = m;
+						SetNZFast(m);
+					} else {
+						uint8_t m;
+						if (LIKELY(NDSMainReadFast(addr, m))) {
+							m = (uint8_t)(m + 1);
+							SetNZFast(m);
+							WriteBus(addr, m);
+						} else {
+							m = (uint8_t)(ReadBus(addr) + 1);
+							SetNZFast(m);
+							WriteBus(addr, m);
+						}
+					}
+					elapsedCycles = 6;
+					break;
+				}
 			case 0x28: { // PLP
 				status = StackPop();
 				status |= CONSTANT;
@@ -1848,11 +2003,11 @@ td_op_done:
 		// The ops extra cycles have been accounted for, it must now be reset
 		opExtraCycles = 0;
 #if defined(NDS_BUILD) && defined(ARM9)
-		opcode_profile_decim++;
-		if ((opcode_profile_decim & (NDS_OPCODE_PROFILE_STRIDE - 1u)) == 0u) {
-			opcode_exec_count[opcode] += NDS_OPCODE_PROFILE_STRIDE;
-			opcode_cycle_count[opcode] += (uint32_t)elapsedCycles * NDS_OPCODE_PROFILE_STRIDE;
-		}
+			opcode_profile_decim++;
+			if ((opcode_profile_decim & (NDS_OPCODE_PROFILE_STRIDE - 1u)) == 0u) {
+				opcode_exec_count[opcode] += NDS_OPCODE_PROFILE_STRIDE;
+				opcode_cycle_count[opcode] += (uint32_t)elapsedCycles * NDS_OPCODE_PROFILE_STRIDE;
+			}
 #endif
 
 		run_pending_cycles += elapsedCycles;
@@ -1898,33 +2053,7 @@ void mos6502::Op_ILLEGAL(uint16_t src)
 
 void mos6502::Op_ADC(uint16_t src)
 {
-	uint8_t m = ReadBus(src);
-	unsigned int tmp = m + A + (IF_CARRY() ? 1 : 0);
-
-	SET_ZERO(!(tmp & 0xFF));
-	if (IF_DECIMAL())
-	{
-		// An extra cycle is required if in decimal mode
-		opExtraCycles += 1;
-
-		if (((A & 0xF) + (m & 0xF) + (IF_CARRY() ? 1 : 0)) > 9) tmp += 6;
-		SET_NEGATIVE(tmp & 0x80);
-		SET_OVERFLOW(!((A ^ m) & 0x80) && ((A ^ tmp) & 0x80));
-		if (tmp > 0x99)
-		{
-			tmp += 96;
-		}
-		SET_CARRY(tmp > 0x99);
-	}
-	else
-	{
-		SET_NEGATIVE(tmp & 0x80);
-		SET_OVERFLOW(!((A ^ m) & 0x80) && ((A ^ tmp) & 0x80));
-		SET_CARRY(tmp > 0xFF);
-	}
-
-	A = tmp & 0xFF;
-	return;
+	ADCFast(ReadBus(src));
 }
 
 
@@ -2441,26 +2570,7 @@ void mos6502::Op_RTS(uint16_t src)
 
 void mos6502::Op_SBC(uint16_t src)
 {
-	uint8_t m = ReadBus(src);
-	unsigned int tmp = A - m - (IF_CARRY() ? 0 : 1);
-	SET_NEGATIVE(tmp & 0x80);
-	SET_ZERO(!(tmp & 0xFF));
-	SET_OVERFLOW(((A ^ tmp) & 0x80) && ((A ^ m) & 0x80));
-
-	if (IF_DECIMAL())
-	{
-		// An extra cycle is required if in decimal mode
-		opExtraCycles += 1;
-
-		if ( ((A & 0x0F) - (IF_CARRY() ? 0 : 1)) < (m & 0x0F)) tmp -= 6;
-		if (tmp > 0x99)
-		{
-			tmp -= 0x60;
-		}
-	}
-	SET_CARRY(tmp < 0x100);
-	A = (tmp & 0xFF);
-	return;
+	SBCFast(ReadBus(src));
 }
 
 void mos6502::Op_SEC(uint16_t src)
@@ -2601,64 +2711,64 @@ void mos6502::Op_BBRx(uint8_t mask, uint8_t val, uint16_t offset)
 
 void mos6502::Op_BBR0(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x01, val, offset);
 }
 
 void mos6502::Op_BBR1(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x02, val, offset);
 }
 
 void mos6502::Op_BBR2(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x04, val, offset);
 }
 
 void mos6502::Op_BBR3(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x08, val, offset);
 }
 
 void mos6502::Op_BBR4(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x10, val, offset);
 }
 
 void mos6502::Op_BBR5(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x20, val, offset);
 }
 
 void mos6502::Op_BBR6(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x40, val, offset);
 }
 
 void mos6502::Op_BBR7(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBRx(0x80, val, offset);
 }
@@ -2683,64 +2793,64 @@ void mos6502::Op_BBSx(uint8_t mask, uint8_t val, uint16_t offset)
 
 void mos6502::Op_BBS0(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x01, val, offset);
 }
 
 void mos6502::Op_BBS1(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x02, val, offset);
 }
 
 void mos6502::Op_BBS2(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x04, val, offset);
 }
 
 void mos6502::Op_BBS3(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x08, val, offset);
 }
 
 void mos6502::Op_BBS4(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x10, val, offset);
 }
 
 void mos6502::Op_BBS5(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x20, val, offset);
 }
 
 void mos6502::Op_BBS6(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x40, val, offset);
 }
 
 void mos6502::Op_BBS7(uint16_t src)
 {
-	auto val = ReadBus(ReadBus(pc++));
-	uint16_t offset = (uint16_t) ReadBus(pc++);
+	auto val = ReadBus(FetchByte());
+	uint16_t offset = (uint16_t)FetchByte();
 
 	Op_BBSx(0x80, val, offset);
 }

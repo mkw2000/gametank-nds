@@ -404,10 +404,13 @@ void ITCM_CODE Blitter::CatchUp(uint64_t cycles) {
         return;
     }
 
-    if(cycles == 0) {
-        cycles = timekeeper->totalCyclesCount - last_updated_cycle;
-    }
-    last_updated_cycle = timekeeper->totalCyclesCount;
+	if(cycles == 0) {
+		cycles = timekeeper->totalCyclesCount - last_updated_cycle;
+		if (cycles == 0) {
+			return;
+		}
+	}
+	last_updated_cycle = timekeeper->totalCyclesCount;
 
     // Use fast batch processing when in steady running state
     // Steady state: running=true, init=false, and not about to finish

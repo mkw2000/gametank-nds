@@ -92,7 +92,7 @@ export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 
 export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-.PHONY: $(BUILD) clean
+.PHONY: $(BUILD) clean run-melonds run-desmume
 
 $(BUILD):
 	@$(MAKE) --no-print-directory -C $(CURDIR)/$(ARM7_DIR)
@@ -103,6 +103,12 @@ clean:
 	@echo clean ...
 	@$(MAKE) --no-print-directory -C $(CURDIR)/$(ARM7_DIR) clean || true
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
+
+run-melonds: $(BUILD)
+	@open -a "/Applications/melonDS.app" "$(CURDIR)/$(TARGET).nds"
+
+run-desmume: $(BUILD)
+	@open -a "/Applications/DeSmuME.app" "$(CURDIR)/$(TARGET).nds"
 
 #---------------------------------------------------------------------------------
 else

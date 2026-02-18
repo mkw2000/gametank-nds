@@ -28,6 +28,14 @@ export DEVKITARM=$DEVKITPRO/devkitARM
 make -j4
 ```
 
+Quick run on desktop emulators (macOS):
+
+```bash
+make run-melonds
+# or
+make run-desmume
+```
+
 Output ROM:
 
 - `gametank-nds.nds`
@@ -90,4 +98,3 @@ Read `AGENTS.md` before making optimization changes. It documents:
 - regressions already encountered
 - safe optimization workflow
 - files to touch for CPU/audio work
-

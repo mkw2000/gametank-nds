@@ -114,7 +114,11 @@ using namespace std;
 const int GT_WIDTH = 128;
 const int GT_HEIGHT = 128;
 
-RomType loadedRomType;
+RomType loadedRomType = RomType::UNKNOWN;
+uint8_t* cached_rom_lo_ptr = nullptr;
+uint8_t* cached_rom_hi_ptr = nullptr;
+uint16_t cached_rom_linear_mask = 0x7FFF;
+uint32_t cached_rom_decode_epoch = 1;
 
 mos6502 *cpu_core;
 Blitter *blitter;
@@ -264,9 +268,49 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 
 // Cached ram_base: updated whenever banking register ($2005) changes
 uint16_t cached_ram_base = 0;
+uint8_t* cached_ram_ptr = system_state.ram;
+bool* cached_ram_init_ptr = system_state.ram_initialized;
 
 static inline void UpdateBankingCache() {
-	cached_ram_base = (system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
+	const uint16_t base = (system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
+	cached_ram_base = base;
+	cached_ram_ptr = &system_state.ram[base];
+	cached_ram_init_ptr = &system_state.ram_initialized[base];
+}
+
+static inline void UpdateRomReadCache() {
+	if (++cached_rom_decode_epoch == 0) {
+		cached_rom_decode_epoch = 1;
+	}
+	// Upper 16KB window is fixed to the flash trailer region for FLASH2M variants.
+	cached_rom_hi_ptr = &cartridge_state.rom[0x1FC000];
+	switch (loadedRomType) {
+		case RomType::FLASH2M:
+			cached_rom_linear_mask = 0x7FFF;
+			cached_rom_lo_ptr = &cartridge_state.rom[(cartridge_state.bank_mask & 0x7F) << 14];
+			break;
+		case RomType::FLASH2M_RAM32K:
+			cached_rom_linear_mask = 0x7FFF;
+			if (!(cartridge_state.bank_mask & 0x80)) {
+				cached_rom_lo_ptr = &cartridge_state.save_ram[(cartridge_state.bank_mask & 0x40) << 8];
+			} else {
+				cached_rom_lo_ptr = &cartridge_state.rom[(cartridge_state.bank_mask & 0x7F) << 14];
+			}
+			break;
+		case RomType::EEPROM8K:
+			cached_rom_lo_ptr = cartridge_state.rom;
+			cached_rom_linear_mask = 0x1FFF;
+			break;
+		case RomType::EEPROM32K:
+			cached_rom_lo_ptr = cartridge_state.rom;
+			cached_rom_linear_mask = 0x7FFF;
+			break;
+		case RomType::UNKNOWN:
+		default:
+			cached_rom_lo_ptr = cartridge_state.rom;
+			cached_rom_linear_mask = 0x7FFF;
+			break;
+	}
 }
 
 #define FULL_RAM_ADDRESS(x) (cached_ram_base | (x))
@@ -411,18 +455,16 @@ void UpdateFlashShiftRegister(uint8_t nextVal) {
 		if(loadedRomType != RomType::FLASH2M_RAM32K) {
 			cartridge_state.bank_mask |= 0x80;
 		}
+		UpdateRomReadCache();
 		//printf("Flash highbits set to %x\n", cartridge_state.bank_mask);
 	}
 }
 
 uint8_t ITCM_CODE MemoryRead_Flash2M(uint16_t address) {
 	if(address & 0x4000) {
-		return cartridge_state.rom[0b111111100000000000000 | (address & 0x3FFF)];
-	} else {
-		if(!(cartridge_state.bank_mask & 0x80))
-			return cartridge_state.save_ram[(address & 0x3FFF) | ((cartridge_state.bank_mask & 0x40) << 8)];
-		else return cartridge_state.rom[((cartridge_state.bank_mask & 0x7F) << 14) | (address & 0x3FFF)];
+		return cached_rom_hi_ptr[address & 0x3FFF];
 	}
+	return cached_rom_lo_ptr[address & 0x3FFF];
 }
 
 uint8_t MemoryRead_Unknown(uint16_t address) {
@@ -440,19 +482,21 @@ static inline uint8_t ITCM_CODE MemoryReadRomFast(uint16_t address) {
 	// Most GameTank ROMs are FLASH2M-style and spend most cycles in this path.
 	const RomType romType = loadedRomType;
 	if(LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
-		return MemoryRead_Flash2M(address);
+		return (address & 0x4000)
+			? cached_rom_hi_ptr[address & 0x3FFF]
+			: cached_rom_lo_ptr[address & 0x3FFF];
 	}
 	if(romType == RomType::EEPROM32K) {
-		return cartridge_state.rom[address & 0x7FFF];
+		return cached_rom_lo_ptr[address & 0x7FFF];
 	}
 	if(romType == RomType::EEPROM8K) {
-		return cartridge_state.rom[address & 0x1FFF];
+		return cached_rom_lo_ptr[address & 0x1FFF];
 	}
 	return MemoryRead_Unknown(address);
 }
 
 uint8_t* GetRAM(const uint16_t address) {
-	return &(system_state.ram[FULL_RAM_ADDRESS(address & 0x1FFF)]);
+	return &(cached_ram_ptr[address & 0x1FFF]);
 }
 
 uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
@@ -476,7 +520,7 @@ uint8_t MemoryReadResolve(const uint16_t address, bool stateful) {
 		return system_state.VIA_regs[address & 0xF];
 	} else if(address < 0x2000) {
 		if(stateful) {
-			if(!system_state.ram_initialized[FULL_RAM_ADDRESS(address & 0x1FFF)]) {
+			if(!cached_ram_init_ptr[address & 0x1FFF]) {
 				//printf("WARNING! Uninitialized RAM read at %x (Bank %x)\n", address, system_state.banking >> 5);
 			}
 		}
@@ -502,7 +546,7 @@ uint8_t ITCM_CODE MemoryReadFast(uint16_t address) {
 	}
 
 	if(LIKELY(address < 0x2000)) {
-		return system_state.ram[FULL_RAM_ADDRESS(address)];
+		return cached_ram_ptr[address];
 	}
 
 	if(address & 0x4000) {
@@ -551,8 +595,8 @@ uint8_t MemorySync(uint16_t address) {
 void ITCM_CODE MemoryWrite(uint16_t address, uint8_t value) {
 	// Most writes are to CPU RAM.
 	if(LIKELY(address < 0x2000)) {
-		system_state.ram_initialized[FULL_RAM_ADDRESS(address)] = true;
-		system_state.ram[FULL_RAM_ADDRESS(address)] = value;
+		cached_ram_init_ptr[address] = true;
+		cached_ram_ptr[address] = value;
 		return;
 	}
 
@@ -891,7 +935,7 @@ extern "C" {
 		
 		cartridge_state.write_mode = false;
 		
-		switch(cartridge_state.size) {
+			switch(cartridge_state.size) {
 			case 8192:
 			loadedRomType = RomType::EEPROM8K;
 			printf("Detected 8K (EEPROM)\n");
@@ -907,10 +951,11 @@ extern "C" {
 			default:
 			// loadedRomType = RomType::UNKNOWN; // Don't override unknown?
 			printf("Unknown ROM type (size %d)\n", cartridge_state.size);
-			if (cartridge_state.size > 2000000) loadedRomType = RomType::FLASH2M; // Assume flash if large
-			else loadedRomType = RomType::EEPROM32K; // Fallback?
-			break;
-		}
+				if (cartridge_state.size > 2000000) loadedRomType = RomType::FLASH2M; // Assume flash if large
+				else loadedRomType = RomType::EEPROM32K; // Fallback?
+				break;
+			}
+			UpdateRomReadCache();
 		
 		printf("Reading %d bytes...\n", cartridge_state.size);
 		fread(cartridge_state.rom, sizeof(uint8_t), cartridge_state.size, romFileP);
@@ -935,14 +980,15 @@ extern "C" {
 				std::cout << "Couldn't find " << flashFileFullPath << "\n";
 			}
 
-			if(
-				(cartridge_state.rom[0x1FFFF0] == 'S') &&
-				(cartridge_state.rom[0x1FFFF1] == 'A') &&
-				(cartridge_state.rom[0x1FFFF2] == 'V') &&
-				(cartridge_state.rom[0x1FFFF3] == 'E')) {
-					loadedRomType = RomType::FLASH2M_RAM32K;
+				if(
+					(cartridge_state.rom[0x1FFFF0] == 'S') &&
+					(cartridge_state.rom[0x1FFFF1] == 'A') &&
+					(cartridge_state.rom[0x1FFFF2] == 'V') &&
+					(cartridge_state.rom[0x1FFFF3] == 'E')) {
+						loadedRomType = RomType::FLASH2M_RAM32K;
+						UpdateRomReadCache();
 #ifdef NDS_BUILD
-					if(file_exists(nvramFileFullPath.c_str())) {
+						if(file_exists(nvramFileFullPath.c_str())) {
 #else
 					if(std::filesystem::exists(nvramFileFullPath.c_str())) {
 #endif
@@ -2169,9 +2215,9 @@ int main(int argC, char* argV[]) {
 
 	const char* rom_file_name = NULL;
 
-#ifdef NDS_BUILD
-	// NDS: initialize hardware
-	defaultExceptionHandler();
+	#ifdef NDS_BUILD
+		// NDS: initialize hardware
+		defaultExceptionHandler();
 
 	// Set up top screen for bitmap output (main engine)
 	videoSetMode(MODE_5_2D);
@@ -2184,12 +2230,16 @@ int main(int argC, char* argV[]) {
 	consoleDemoInit();
 	// consoleDemoInit uses the sub engine by default
 
-	printf("GameTank Emulator - NDS\n");
+		printf("GameTank Emulator - NDS\n");
 
-	// Initialize libfat for SD card access
-	if (!fatInitDefault()) {
-		printf("SD card init failed!\n");
-	}
+		// Initialize libfat for SD card access
+		if (!fatInitDefault()) {
+			printf("SD card init failed!\n");
+			// Emulator fallback: avoid blocking PXI audio startup when ARM7 side isn't ready.
+			// On real hardware with a working card this path won't run.
+			EmulatorConfig::noSound = true;
+			printf("Audio disabled (no SD/libfat)\n");
+		}
 
 	// Clear DS top screen VRAM to black
 	uint16_t* dsVram = (uint16_t*)BG_BMP_RAM(0);
@@ -2247,6 +2297,7 @@ int main(int argC, char* argV[]) {
 #else
 	cpu_core = new mos6502(MemoryReadFast, MemoryWrite, CPUStopped, MemorySync);
 #endif
+	UpdateRomReadCache();
 	cpu_core->Reset();
 	cartridge_state.write_mode = false;
 
