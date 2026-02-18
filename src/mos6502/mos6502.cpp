@@ -83,6 +83,7 @@ struct NDSRomDecodeEntry {
 	uint8_t opcode;
 	uint8_t op1;
 	uint8_t op2;
+	uint16_t abs;
 };
 
 static NDSRomDecodeEntry g_nds_rom_decode[0x8000];
@@ -96,6 +97,7 @@ static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 		if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 		if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
 		if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+		entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
 	}
 	return entry;
 }
@@ -1723,19 +1725,17 @@ td_op_slow:
 					break;
 				}
 				case 0xAD: { // LDA ABS
-					uint16_t lo;
-					uint16_t hi;
+					uint16_t addr;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						lo = dec.op1;
-						hi = dec.op2;
+						addr = dec.abs;
 						pc = (uint16_t)(pc + 2);
 					} else {
-						lo = FetchByte();
-						hi = FetchByte();
+						const uint16_t lo = FetchByte();
+						const uint16_t hi = FetchByte();
+						addr = (uint16_t)(lo | (hi << 8));
 					}
-					const uint16_t addr = (uint16_t)(lo | (hi << 8));
 					uint8_t m;
 					if (LIKELY(NDSMainReadFast(addr, m))) {
 						A = m;
@@ -2044,19 +2044,17 @@ td_op_slow:
 					break;
 				}
 				case 0x20: { // JSR ABS
-					uint16_t lo;
-					uint16_t hi;
+					uint16_t target;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						lo = dec.op1;
-						hi = dec.op2;
+						target = dec.abs;
 						pc = (uint16_t)(pc + 2);
 					} else {
-						lo = FetchByte();
-						hi = FetchByte();
+						const uint16_t lo = FetchByte();
+						const uint16_t hi = FetchByte();
+						target = (uint16_t)(lo | (hi << 8));
 					}
-					const uint16_t target = (uint16_t)(lo | (hi << 8));
 					const uint16_t ret = (uint16_t)(pc - 1);
 #if defined(NDS_BUILD) && defined(ARM9)
 					if (LIKELY(Sync == NULL)) {
@@ -2079,19 +2077,15 @@ td_op_slow:
 					break;
 				}
 				case 0x4C: { // JMP ABS
-					uint16_t lo;
-					uint16_t hi;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						lo = dec.op1;
-						hi = dec.op2;
-						pc = (uint16_t)(pc + 2);
+						pc = dec.abs;
 					} else {
-						lo = FetchByte();
-						hi = FetchByte();
+						const uint16_t lo = FetchByte();
+						const uint16_t hi = FetchByte();
+						pc = (uint16_t)(lo | (hi << 8));
 					}
-					pc = (uint16_t)(lo | (hi << 8));
 					elapsedCycles = 3;
 					break;
 				}
