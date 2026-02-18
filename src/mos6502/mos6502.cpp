@@ -86,6 +86,8 @@ struct NDSRomDecodeEntry {
 	uint16_t abs;
 	uint8_t abs_read_mode;
 	int16_t rel;
+	uint16_t rel_target;
+	uint8_t rel_taken_cycles;
 	const uint8_t* abs_ptr;
 };
 
@@ -135,6 +137,9 @@ static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 		entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
 		entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
 		entry.rel = (int16_t)(int8_t)entry.op1;
+		const uint16_t rel_base = (uint16_t)(opPc + 2);
+		entry.rel_target = (uint16_t)(rel_base + entry.rel);
+		entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
 		switch (entry.abs_read_mode) {
 			case NDS_ABS_READ_ROM_LO:
 				entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
@@ -2104,21 +2109,25 @@ td_op_slow:
 					break;
 				}
 				case 0xD0: { // BNE REL
-					int16_t rel;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						rel = dec.rel;
-						pc = (uint16_t)(pc + 1);
+						pc = (uint16_t)(opPc + 2);
+						if ((status & ZERO) == 0) {
+							pc = dec.rel_target;
+							elapsedCycles = dec.rel_taken_cycles;
+						} else {
+							elapsedCycles = 2;
+						}
 					} else {
-						rel = (int16_t)(int8_t)FetchByte();
-					}
-					if ((status & ZERO) == 0) {
-						const uint16_t oldPc = pc;
-						pc = (uint16_t)(pc + rel);
-						elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
-					} else {
-						elapsedCycles = 2;
+						const int16_t rel = (int16_t)(int8_t)FetchByte();
+						if ((status & ZERO) == 0) {
+							const uint16_t oldPc = pc;
+							pc = (uint16_t)(pc + rel);
+							elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
+						} else {
+							elapsedCycles = 2;
+						}
 					}
 					break;
 				}
