@@ -1831,48 +1831,9 @@ td_op_slow:
 					break;
 				}
 				case 0xAD: { // LDA ABS
-					uint16_t addr;
-					uint8_t absReadMode = NDS_ABS_READ_FALLBACK;
-					const uint8_t* absPtr = nullptr;
-					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL)) {
-						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						addr = dec.abs;
-						absReadMode = dec.abs_read_mode;
-						absPtr = dec.abs_ptr;
-						pc = (uint16_t)(pc + 2);
-					} else {
-						const uint16_t lo = FetchByte();
-						const uint16_t hi = FetchByte();
-						addr = (uint16_t)(lo | (hi << 8));
-					}
-					uint8_t m = 0;
-					if (LIKELY(Sync == NULL)) {
-						if (LIKELY(absPtr != nullptr)) {
-							m = *absPtr;
-						} else {
-							switch (absReadMode) {
-								case NDS_ABS_READ_RAM:
-									m = cached_ram_ptr[addr];
-									break;
-								case NDS_ABS_READ_AUDIO:
-									m = GT_AudioRamRead(addr);
-									break;
-								case NDS_ABS_READ_JOY:
-									m = GT_JoystickReadFast((uint8_t)addr);
-									break;
-								case NDS_ABS_READ_OPEN_BUS:
-									m = open_bus();
-									break;
-								default:
-									m = ReadBus(addr);
-									break;
-							}
-						}
-					} else {
-						m = ReadBus(addr);
-					}
-					A = m;
+					const uint16_t lo = FetchByte();
+					const uint16_t hi = FetchByte();
+					A = ReadBus((uint16_t)(lo | (hi << 8)));
 					SetNZFast(A);
 					elapsedCycles = 4;
 					break;
@@ -2156,25 +2117,13 @@ td_op_slow:
 					break;
 				}
 				case 0xD0: { // BNE REL
-					const uint16_t opPc = (uint16_t)(pc - 1);
-					if (LIKELY(Sync == NULL)) {
-						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						pc = (uint16_t)(opPc + 2);
-						if ((status & ZERO) == 0) {
-							pc = dec.rel_target;
-							elapsedCycles = dec.rel_taken_cycles;
-						} else {
-							elapsedCycles = 2;
-						}
+					const int16_t rel = (int16_t)(int8_t)FetchByte();
+					if ((status & ZERO) == 0) {
+						const uint16_t oldPc = pc;
+						pc = (uint16_t)(pc + rel);
+						elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
 					} else {
-						const int16_t rel = (int16_t)(int8_t)FetchByte();
-						if ((status & ZERO) == 0) {
-							const uint16_t oldPc = pc;
-							pc = (uint16_t)(pc + rel);
-							elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
-						} else {
-							elapsedCycles = 2;
-						}
+						elapsedCycles = 2;
 					}
 					break;
 				}
