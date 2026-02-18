@@ -109,6 +109,8 @@ mos6502_run_hot_arm:
     beq  47f
     cmp  r1, #0xC0      /* CPY IMM */
     beq  48f
+    cmp  r1, #0xEE      /* INC ABS */
+    beq  56f
     cmp  r1, #0x18      /* CLC */
     beq  49f
     cmp  r1, #0x38      /* SEC */
@@ -584,6 +586,32 @@ mos6502_run_hot_arm:
 55: /* CLV */
     bic  r7, r7, #0x40
     sub  r11, r11, #2
+    b    1b
+
+56: /* INC ABS */
+    mov  r0, r8
+    blx  r9
+    and  r2, r0, #0xFF
+    add  r8, r8, #1
+    mov  r0, r8
+    blx  r9
+    and  r3, r0, #0xFF
+    add  r8, r8, #1
+    orr  r0, r2, r3, lsl #8
+    str  r0, [sp, #20]   /* save absolute addr */
+    blx  r9
+    and  r2, r0, #0xFF
+    add  r2, r2, #1
+    and  r2, r2, #0xFF
+    bic  r7, r7, #0x82
+    cmp  r2, #0
+    orreq r7, r7, #0x02
+    tst  r2, #0x80
+    orrne r7, r7, #0x80
+    ldr  r0, [sp, #20]
+    mov  r1, r2
+    blx  r10
+    sub  r11, r11, #6
     b    1b
 
 90: /* flush state */
