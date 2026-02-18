@@ -1644,7 +1644,16 @@ td_op_slow:
 #endif
 			switch(opcode) {
 				case 0x69: { // ADC IMM
-					ADCFast(FetchByte());
+					uint8_t imm;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						imm = dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						imm = FetchByte();
+					}
+					ADCFast(imm);
 					elapsedCycles = 2;
 					break;
 				}
@@ -1712,7 +1721,16 @@ td_op_slow:
 					break;
 				}
 				case 0xA9: { // LDA IMM
-					A = FetchByte();
+					uint8_t imm;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						imm = dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						imm = FetchByte();
+					}
+					A = imm;
 					SetNZFast(A);
 					elapsedCycles = 2;
 					break;
@@ -1747,13 +1765,31 @@ td_op_slow:
 					break;
 				}
 				case 0x49: { // EOR IMM
-					A ^= FetchByte();
+					uint8_t imm;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						imm = dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						imm = FetchByte();
+					}
+					A ^= imm;
 					SetNZFast(A);
 					elapsedCycles = 2;
 					break;
 				}
 				case 0xE9: { // SBC IMM
-					SBCFast(FetchByte());
+					uint8_t imm;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						imm = dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						imm = FetchByte();
+					}
+					SBCFast(imm);
 					elapsedCycles = 2;
 					break;
 				}
@@ -1790,8 +1826,17 @@ td_op_slow:
 					break;
 				}
 				case 0xB0: { // BCS REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (IF_CARRY()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1802,8 +1847,17 @@ td_op_slow:
 					break;
 				}
 				case 0x90: { // BCC REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (!IF_CARRY()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1814,8 +1868,17 @@ td_op_slow:
 					break;
 				}
 				case 0xF0: { // BEQ REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (IF_ZERO()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1826,8 +1889,17 @@ td_op_slow:
 					break;
 				}
 				case 0x10: { // BPL REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (!IF_NEGATIVE()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1838,8 +1910,17 @@ td_op_slow:
 					break;
 				}
 				case 0x30: { // BMI REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (IF_NEGATIVE()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1850,8 +1931,17 @@ td_op_slow:
 					break;
 				}
 				case 0x50: { // BVC REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (!IF_OVERFLOW()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1862,8 +1952,17 @@ td_op_slow:
 					break;
 				}
 				case 0x70: { // BVS REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (IF_OVERFLOW()) {
 						if (!addressesSamePage(pc, target)) opExtraCycles++;
@@ -1874,8 +1973,17 @@ td_op_slow:
 					break;
 				}
 				case 0x80: { // BRA REL
-					uint16_t off = (uint16_t)FetchByte();
-					if (off & 0x80) off |= 0xFF00;
+					int8_t off8;
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					if (LIKELY(Sync == NULL) && LIKELY(opPc <= 0xFFFE)) {
+						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
+						off8 = (int8_t)dec.op1;
+						pc = (uint16_t)(pc + 1);
+					} else {
+						off8 = (int8_t)FetchByte();
+					}
+					uint16_t off = (uint16_t)off8;
+					if (off8 < 0) off |= 0xFF00;
 					const uint16_t target = pc + (int16_t)off;
 					if (!addressesSamePage(pc, target)) opExtraCycles++;
 					pc = target;
