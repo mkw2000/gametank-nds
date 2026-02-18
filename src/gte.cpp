@@ -1175,13 +1175,14 @@ struct NDSPerfStats {
 static NDSPerfStats ndsPerf;
 static uint32_t ndsLastOpcodeExec[256] = {0};
 static uint64_t ndsLastOpcodeCycles[256] = {0};
+#define NDS_PERF_PRINT_INTERVAL_FRAMES 180
 
 static void NDSPerfMaybePrint() {
 	if (!ndsPerf.enabled || ndsMenuOpen) {
 		return;
 	}
 	const uint64_t frameDelta = ndsPerf.frames - ndsPerf.lastFrames;
-	if (frameDelta < 60) {
+	if (frameDelta < NDS_PERF_PRINT_INTERVAL_FRAMES) {
 		return;
 	}
 
