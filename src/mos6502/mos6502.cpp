@@ -53,13 +53,29 @@ static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
 			out = cached_rom_lo_ptr[address & cached_rom_linear_mask];
 			return true;
 		}
-		return false;
 	}
 	if(address < 0x2000) {
 		out = cached_ram_ptr[address];
 		return true;
 	}
-	return false;
+	// VDMA reads are timing-coupled with the blitter and must flush cycles.
+	if (address & 0x4000) {
+		return false;
+	}
+	if ((address >= 0x3000) && (address <= 0x3FFF)) {
+		out = GT_AudioRamRead(address);
+		return true;
+	}
+	if ((address >= 0x2800) && (address <= 0x2FFF)) {
+		out = system_state.VIA_regs[address & 0xF];
+		return true;
+	}
+	if ((address == 0x2008) || (address == 0x2009)) {
+		out = GT_JoystickReadFast((uint8_t)address);
+		return true;
+	}
+	out = open_bus();
+	return true;
 }
 
 struct NDSRomDecodeEntry {
