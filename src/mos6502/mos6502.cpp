@@ -31,21 +31,6 @@ extern uint16_t cached_ram_base;
 #ifndef NDS_OPCODE_PROFILE_STRIDE
 #define NDS_OPCODE_PROFILE_STRIDE 4u
 #endif
-
-extern "C" int32_t mos6502_run_hot_arm(
-	uint8_t* A, uint8_t* X, uint8_t* Y, uint8_t* status,
-	uint16_t* pc, uint8_t (*readfn)(uint16_t), void (*writefn)(uint16_t, uint8_t),
-	int32_t cycles_remaining);
-
-static mos6502* g_hot_cpu = nullptr;
-
-static uint8_t ITCM_CODE mos6502_hot_read(uint16_t address) {
-	return g_hot_cpu->HotReadBus(address);
-}
-
-static void ITCM_CODE mos6502_hot_write(uint16_t address, uint8_t value) {
-	g_hot_cpu->HotWriteBus(address, value);
-}
 #endif
 
 mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
@@ -1081,16 +1066,6 @@ inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 	(*Write)(address, value);
 }
 
-uint8_t mos6502::HotReadBus(uint16_t address)
-{
-	return ReadBus(address);
-}
-
-void mos6502::HotWriteBus(uint16_t address, uint8_t value)
-{
-	WriteBus(address, value);
-}
-
 inline uint8_t mos6502::FetchByte()
 {
 	const uint16_t address = pc++;
@@ -1787,91 +1762,7 @@ void mos6502::RunOptimized(
 	int32_t cyclesRemaining,
 	uint64_t& cycleCount
 ) {
-#if defined(NDS_BUILD) && defined(ARM9)
-	run_cycle_target = &cycleCount;
-	run_pending_cycles = 0;
-
-	if (UNLIKELY(freeze)) {
-		run_cycle_target = nullptr;
-		return;
-	}
-
-	while ((cyclesRemaining > 0) && !illegalOpcode) {
-		if (UNLIKELY(waiting)) {
-			if (UNLIKELY(irq_line)) {
-				waiting = false;
-				IRQ();
-			} else if (irq_timer > 0) {
-				if (cyclesRemaining >= (int32_t)irq_timer) {
-					run_pending_cycles += irq_timer;
-					cyclesRemaining -= irq_timer;
-					irq_timer = 0;
-					if ((irq_gate == NULL) || (*irq_gate)) {
-						irq_line = true;
-						IRQ();
-					}
-				} else {
-					irq_timer -= cyclesRemaining;
-					run_pending_cycles += (uint32_t)cyclesRemaining;
-					cyclesRemaining = 0;
-					break;
-				}
-			} else {
-				break;
-			}
-		} else if (UNLIKELY(irq_line)) {
-			IRQ();
-		}
-
-		if (UNLIKELY(freeze)) {
-			break;
-		}
-
-		g_hot_cpu = this;
-		const int32_t consumed = mos6502_run_hot_arm(
-			&A, &X, &Y, &status, &pc, mos6502_hot_read, mos6502_hot_write, cyclesRemaining);
-		g_hot_cpu = nullptr;
-
-		if (consumed > 0) {
-			run_pending_cycles += (uint32_t)consumed;
-			cyclesRemaining -= consumed;
-
-			if (irq_timer > 0) {
-				if ((uint32_t)consumed >= irq_timer) {
-					irq_timer = 0;
-					if ((irq_gate == NULL) || (*irq_gate)) {
-						IRQ();
-						irq_line = true;
-					}
-				} else {
-					irq_timer -= (uint32_t)consumed;
-				}
-			}
-		}
-
-		if ((cyclesRemaining <= 0) || illegalOpcode || freeze) {
-			break;
-		}
-
-		// Unsupported opcode hit: execute exactly one instruction in C++ and return to ARM hot loop.
-		FlushRunCycles();
-		run_cycle_target = nullptr;
-		const uint64_t before = cycleCount;
-		Run(1, cycleCount, INST_COUNT);
-		const int32_t spent = (int32_t)(cycleCount - before);
-		if (spent <= 0) {
-			break;
-		}
-		cyclesRemaining -= spent;
-		run_cycle_target = &cycleCount;
-		run_pending_cycles = 0;
-	}
-
-	FlushRunCycles();
-	run_cycle_target = nullptr;
-#else
 	Run(cyclesRemaining, cycleCount, CYCLE_COUNT);
-#endif
 }
 
 void mos6502::Exec(Instr i)
