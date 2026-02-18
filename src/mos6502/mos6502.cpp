@@ -1593,11 +1593,6 @@ void mos6502::Run(
 
 	while((cyclesRemaining > 0) && !illegalOpcode)
 	{
-#if defined(NDS_BUILD) && defined(ARM9)
-		bool hasChainedOpcode = false;
-		uint8_t chainedOpcode = 0;
-		uint8_t chainedCycles = 0;
-#endif
 		if (UNLIKELY(waiting)) {
 			if (UNLIKELY(irq_line)) {
 				waiting = false;
@@ -1749,31 +1744,6 @@ td_op_slow:
 					}
 					SetNZFast(A);
 					elapsedCycles = 4;
-
-#if defined(NDS_BUILD) && defined(ARM9)
-					// Superinstruction fast path for common AD->D0 loops.
-					// Safe gating: no sync callback path, no pending IRQ timer,
-					// and cycle-count mode only.
-					if (LIKELY(Sync == NULL) &&
-						LIKELY(cycleMethod == CYCLE_COUNT) &&
-						LIKELY(irq_timer == 0) &&
-						LIKELY(!irq_line) &&
-						LIKELY(cyclesRemaining > elapsedCycles)) {
-						const NDSRomDecodeEntry& next = NDSGetRomDecode(pc);
-						if (next.opcode == 0xD0) {
-							pc = (uint16_t)(pc + 2); // consume D0 + REL operand
-							if ((status & ZERO) == 0) {
-								const uint16_t oldPc = pc;
-								pc = (uint16_t)(pc + (int8_t)next.op1);
-								chainedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
-							} else {
-								chainedCycles = 2;
-							}
-							hasChainedOpcode = true;
-							chainedOpcode = 0xD0;
-						}
-					}
-#endif
 					break;
 				}
 				case 0xA5: { // LDA ZER
@@ -2220,20 +2190,6 @@ td_op_done:
 				}
 			}
 		}
-
-#if defined(NDS_BUILD) && defined(ARM9)
-		if (hasChainedOpcode && !illegalOpcode && (cyclesRemaining > 0)) {
-			opcode_profile_decim++;
-			if (opcode_profile_decim >= NDS_OPCODE_PROFILE_STRIDE) {
-				opcode_profile_decim = 0;
-				opcode_exec_count[chainedOpcode] += NDS_OPCODE_PROFILE_STRIDE;
-				opcode_cycle_count[chainedOpcode] += (uint32_t)chainedCycles * NDS_OPCODE_PROFILE_STRIDE;
-			}
-
-			run_pending_cycles += chainedCycles;
-			cyclesRemaining -= chainedCycles;
-		}
-#endif
 	}
 	FlushRunCycles();
 	run_cycle_target = nullptr;
