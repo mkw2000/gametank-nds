@@ -1659,7 +1659,9 @@ void mos6502::Run(
 	while((cyclesRemaining > 0) && !illegalOpcode)
 	{
 #if defined(NDS_BUILD) && defined(ARM9)
-		if (LIKELY(Sync == NULL && !waiting && !freeze && !irq_line)) {
+		if (LIKELY(Sync == NULL && !waiting && !freeze)) {
+			// Deliver pending IRQ before entering asm loop
+			if (UNLIKELY(irq_line)) IRQ();
 			// Fast path: run as many instructions as possible in assembly
 			int32_t asm_cycles = cyclesRemaining;
 			if (irq_timer > 0 && (int32_t)irq_timer < asm_cycles)

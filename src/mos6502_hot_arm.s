@@ -1076,25 +1076,16 @@ mos6502_run_asm:
     tst     r7, #0x08
     bne     .Lexit_unhandled
     FETCH_IMM r0
-    /* SBC: A - M - !C */
-    and     r1, r7, #0x01       /* carry (borrow inverted) */
+    /* SBC: A - M - borrow, where borrow = !carry */
+    and     r1, r7, #0x01
     eor     r1, r1, #1          /* borrow = !carry */
     sub     r2, r4, r0
     sub     r2, r2, r1
     bic     r7, r7, #0xC3
-    /* carry = no borrow = result >= 0 (unsigned) */
-    cmp     r4, r0
-    bhi     .Lop_E9_carry
-    beq     .Lop_E9_check_borrow
-    b       .Lop_E9_no_carry
-.Lop_E9_check_borrow:
-    tst     r1, #1               /* if borrow, no carry */
-    beq     .Lop_E9_carry
-.Lop_E9_no_carry:
-    b       .Lop_E9_flags
-.Lop_E9_carry:
-    orr     r7, r7, #0x01
-.Lop_E9_flags:
+    /* carry = A >= (M + borrow) */
+    add     r3, r0, r1
+    cmp     r4, r3
+    orrhs   r7, r7, #0x01
     and     r2, r2, #0xFF
     /* overflow: (A^result) & (A^M) & 0x80 */
     eor     r1, r4, r2
