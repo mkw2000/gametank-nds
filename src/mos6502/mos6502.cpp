@@ -91,9 +91,12 @@ struct NDSRomDecodeEntry {
 	const uint8_t* abs_ptr;
 };
 
-// Cache size tuned for real games: 2048 entries = 64KB
-// Direct-mapped: index by PC, tag includes high bits + epoch
-static NDSRomDecodeEntry g_nds_rom_decode[2048];
+// Cache size: 512 entries * ~24 bytes = ~12KB
+// Smaller table = better ARM9 data cache utilization (4KB D-cache)
+// Direct-mapped: index by PC & 0x1FF, tag includes high bits + epoch
+#define NDS_DECODE_CACHE_SIZE 512
+#define NDS_DECODE_CACHE_MASK 0x1FF
+static NDSRomDecodeEntry g_nds_rom_decode[NDS_DECODE_CACHE_SIZE];
 
 enum NDSAbsReadMode : uint8_t {
 	NDS_ABS_READ_RAM = 0,
@@ -129,9 +132,9 @@ static inline uint8_t NDSClassifyAbsReadMode(uint16_t address)
 
 static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 {
-	NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+	NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
 	const uint32_t epoch = cached_rom_decode_epoch;
-	const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+	const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 	if (UNLIKELY(entry.tag != expected_tag)) {
 		entry.tag = expected_tag;
 		if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
@@ -1744,9 +1747,9 @@ td_op_slow:
 			if (LIKELY(Sync == NULL)) {
 				if (LIKELY(opcode == 0xAD)) { // LDA ABS - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 					if (UNLIKELY(entry.tag != expected_tag)) {
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
@@ -1798,9 +1801,9 @@ td_op_slow:
 
 						} else if (LIKELY(opcode == 0xD0)) { // BNE REL - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 					if (UNLIKELY(entry.tag != expected_tag)) {
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
@@ -1840,9 +1843,9 @@ td_op_slow:
 					handledHot = true;
 				} else if (LIKELY(opcode == 0xA5)) { // LDA ZER - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 					if (UNLIKELY(entry.tag != expected_tag)) {
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
@@ -1863,9 +1866,9 @@ td_op_slow:
 					handledHot = true;
 				} else if (LIKELY(opcode == 0x8D)) { // STA ABS - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & 0x7FF];
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
 					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~0x7FF);
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 					if (UNLIKELY(entry.tag != expected_tag)) {
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
@@ -1917,6 +1920,185 @@ td_op_slow:
 					}
 					pc = (uint16_t)(pc + 2);
 					elapsedCycles = 4;
+					handledHot = true;
+				} else if (opcode == 0xA9) { // LDA IMM - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						entry.op2 = 0;
+						entry.abs = entry.op1;
+						entry.abs_read_mode = NDS_ABS_READ_RAM;
+						entry.abs_ptr = nullptr;
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+					}
+					A = entry.op1;
+					SetNZFast(A);
+					pc = (uint16_t)(pc + 1);
+					elapsedCycles = 2;
+					handledHot = true;
+				} else if (opcode == 0x85) { // STA ZER - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						entry.op2 = 0;
+						entry.abs = entry.op1;
+						entry.abs_read_mode = NDS_ABS_READ_RAM;
+						entry.abs_ptr = nullptr;
+						entry.rel = 0;
+						entry.rel_target = 0;
+						entry.rel_taken_cycles = 0;
+					}
+					cached_ram_init_ptr[entry.op1] = true;
+					cached_ram_ptr[entry.op1] = A;
+					pc = (uint16_t)(pc + 1);
+					elapsedCycles = 3;
+					handledHot = true;
+				} else if (opcode == 0xF0) { // BEQ REL - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+						switch (entry.abs_read_mode) {
+							case NDS_ABS_READ_ROM_LO:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_VIA:
+								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+								break;
+							default:
+								entry.abs_ptr = nullptr;
+								break;
+						}
+					}
+					pc = (uint16_t)(opPc + 2);
+					if (status & ZERO) {
+						pc = entry.rel_target;
+						elapsedCycles = entry.rel_taken_cycles;
+					} else {
+						elapsedCycles = 2;
+					}
+					handledHot = true;
+				} else if (opcode == 0x4C) { // JMP ABS - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+						switch (entry.abs_read_mode) {
+							case NDS_ABS_READ_ROM_LO:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_VIA:
+								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+								break;
+							default:
+								entry.abs_ptr = nullptr;
+								break;
+						}
+					}
+					pc = entry.abs;
+					elapsedCycles = 3;
+					handledHot = true;
+				} else if (opcode == 0x20) { // JSR ABS - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+						switch (entry.abs_read_mode) {
+							case NDS_ABS_READ_ROM_LO:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_VIA:
+								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+								break;
+							default:
+								entry.abs_ptr = nullptr;
+								break;
+						}
+					}
+					pc = (uint16_t)(opPc + 3);
+					const uint16_t ret = (uint16_t)(pc - 1);
+					uint16_t saddr = (uint16_t)(0x0100u + sp);
+					cached_ram_init_ptr[saddr] = true;
+					cached_ram_ptr[saddr] = (uint8_t)(ret >> 8);
+					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+					saddr = (uint16_t)(0x0100u + sp);
+					cached_ram_init_ptr[saddr] = true;
+					cached_ram_ptr[saddr] = (uint8_t)(ret & 0xFF);
+					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+					pc = entry.abs;
+					elapsedCycles = 6;
+					handledHot = true;
+				} else if (opcode == 0x60) { // RTS - fully inlined
+					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+					const uint16_t lo = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+					const uint16_t hi = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+					pc = (uint16_t)(((hi << 8) | lo) + 1);
+					elapsedCycles = 6;
 					handledHot = true;
 				}
 			}

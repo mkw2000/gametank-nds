@@ -114,11 +114,11 @@ using namespace std;
 const int GT_WIDTH = 128;
 const int GT_HEIGHT = 128;
 
-RomType loadedRomType = RomType::UNKNOWN;
-uint8_t* cached_rom_lo_ptr = nullptr;
-uint8_t* cached_rom_hi_ptr = nullptr;
-uint16_t cached_rom_linear_mask = 0x7FFF;
-uint32_t cached_rom_decode_epoch = 1;
+DTCM_BSS RomType loadedRomType;  // default-initialized to 0 = UNKNOWN
+DTCM_BSS uint8_t* cached_rom_lo_ptr;
+DTCM_BSS uint8_t* cached_rom_hi_ptr;
+DTCM_DATA uint16_t cached_rom_linear_mask = 0x7FFF;
+DTCM_DATA uint32_t cached_rom_decode_epoch = 1;
 
 mos6502 *cpu_core;
 Blitter *blitter;
@@ -268,8 +268,8 @@ const uint8_t VIA_SPI_BIT_MISO = 0b10000000;
 
 // Cached ram_base: updated whenever banking register ($2005) changes
 uint16_t cached_ram_base = 0;
-uint8_t* cached_ram_ptr = system_state.ram;
-bool* cached_ram_init_ptr = system_state.ram_initialized;
+DTCM_BSS uint8_t* cached_ram_ptr;  // set by UpdateBankingCache()
+DTCM_BSS bool* cached_ram_init_ptr;  // set by UpdateBankingCache()
 
 static inline void UpdateBankingCache() {
 	const uint16_t base = (system_state.banking & BANK_RAM_MASK) << RAM_HIGHBITS_SHIFT;
