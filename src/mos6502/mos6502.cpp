@@ -36,7 +36,7 @@ extern "C" void GT_AudioRamWrite(uint16_t address, uint8_t value);
 extern "C" uint8_t GT_JoystickReadFast(uint8_t portNum);
 
 #ifndef NDS_OPCODE_PROFILE_STRIDE
-#define NDS_OPCODE_PROFILE_STRIDE 16u
+#define NDS_OPCODE_PROFILE_STRIDE 17u
 #endif
 
 static inline bool NDSMainReadFast(uint16_t address, uint8_t& out)
@@ -2154,7 +2154,10 @@ td_op_done:
 		opExtraCycles = 0;
 #if defined(NDS_BUILD) && defined(ARM9)
 			opcode_profile_decim++;
-			if ((opcode_profile_decim & (NDS_OPCODE_PROFILE_STRIDE - 1u)) == 0u) {
+			// Use odd-stride periodic sampling to avoid phase-lock aliasing
+			// on tiny opcode loops (e.g. alternating AD/D0).
+			if (opcode_profile_decim >= NDS_OPCODE_PROFILE_STRIDE) {
+				opcode_profile_decim = 0;
 				opcode_exec_count[opcode] += NDS_OPCODE_PROFILE_STRIDE;
 				opcode_cycle_count[opcode] += (uint32_t)elapsedCycles * NDS_OPCODE_PROFILE_STRIDE;
 			}
