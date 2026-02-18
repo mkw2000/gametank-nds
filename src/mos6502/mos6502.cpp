@@ -1685,10 +1685,27 @@ void mos6502::Run(
 			IRQ();
 		}
 		// fetch
-		if(Sync == NULL) {
-			opcode = FetchByte();
-		} else {
-			opcode = Sync(pc++);
+#if defined(NDS_BUILD) && defined(ARM9)
+		// Try decode cache first: if the entry for this PC is valid,
+		// use the cached opcode byte and skip the ROM read entirely.
+		if (LIKELY(Sync == NULL)) {
+			const uint16_t prefetchPc = pc;
+			const NDSRomDecodeEntry& prefetch = g_nds_rom_decode[prefetchPc & NDS_DECODE_CACHE_MASK];
+			const uint32_t expected_tag = (cached_rom_decode_epoch << 16) | (prefetchPc & ~NDS_DECODE_CACHE_MASK);
+			if (LIKELY(prefetch.tag == expected_tag)) {
+				opcode = prefetch.opcode;
+				pc++;
+			} else {
+				opcode = FetchByte();
+			}
+		} else
+#endif
+		{
+			if(Sync == NULL) {
+				opcode = FetchByte();
+			} else {
+				opcode = Sync(pc++);
+			}
 		}
 		if (UNLIKELY(freeze)) {
 			--pc;
