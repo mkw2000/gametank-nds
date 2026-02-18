@@ -84,9 +84,43 @@ struct NDSRomDecodeEntry {
 	uint8_t op1;
 	uint8_t op2;
 	uint16_t abs;
+	uint8_t abs_read_mode;
+	int16_t rel;
 };
 
 static NDSRomDecodeEntry g_nds_rom_decode[0x8000];
+
+enum NDSAbsReadMode : uint8_t {
+	NDS_ABS_READ_RAM = 0,
+	NDS_ABS_READ_ROM_LO,
+	NDS_ABS_READ_ROM_HI,
+	NDS_ABS_READ_ROM_LINEAR,
+	NDS_ABS_READ_AUDIO,
+	NDS_ABS_READ_VIA,
+	NDS_ABS_READ_JOY,
+	NDS_ABS_READ_OPEN_BUS,
+	NDS_ABS_READ_FALLBACK
+};
+
+static inline uint8_t NDSClassifyAbsReadMode(uint16_t address)
+{
+	if (address < 0x2000) return NDS_ABS_READ_RAM;
+	if (address & 0x8000) {
+		const RomType romType = loadedRomType;
+		if (LIKELY((romType == RomType::FLASH2M) || (romType == RomType::FLASH2M_RAM32K))) {
+			return (address & 0x4000) ? NDS_ABS_READ_ROM_HI : NDS_ABS_READ_ROM_LO;
+		}
+		if ((romType == RomType::EEPROM32K) || (romType == RomType::EEPROM8K)) {
+			return NDS_ABS_READ_ROM_LINEAR;
+		}
+		return NDS_ABS_READ_FALLBACK;
+	}
+	if (address & 0x4000) return NDS_ABS_READ_FALLBACK; // VDMA/timing-coupled
+	if ((address >= 0x3000) && (address <= 0x3FFF)) return NDS_ABS_READ_AUDIO;
+	if ((address >= 0x2800) && (address <= 0x2FFF)) return NDS_ABS_READ_VIA;
+	if ((address == 0x2008) || (address == 0x2009)) return NDS_ABS_READ_JOY;
+	return NDS_ABS_READ_OPEN_BUS;
+}
 
 static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 {
@@ -98,6 +132,8 @@ static inline const NDSRomDecodeEntry& NDSGetRomDecode(uint16_t opPc)
 		if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
 		if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
 		entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+		entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+		entry.rel = (int16_t)(int8_t)entry.op1;
 	}
 	return entry;
 }
@@ -1726,22 +1762,53 @@ td_op_slow:
 				}
 				case 0xAD: { // LDA ABS
 					uint16_t addr;
+					uint8_t absReadMode = NDS_ABS_READ_FALLBACK;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
 						addr = dec.abs;
+						absReadMode = dec.abs_read_mode;
 						pc = (uint16_t)(pc + 2);
 					} else {
 						const uint16_t lo = FetchByte();
 						const uint16_t hi = FetchByte();
 						addr = (uint16_t)(lo | (hi << 8));
 					}
-					uint8_t m;
-					if (LIKELY(NDSMainReadFast(addr, m))) {
-						A = m;
+					uint8_t m = 0;
+					if (LIKELY(Sync == NULL)) {
+						switch (absReadMode) {
+							case NDS_ABS_READ_RAM:
+								m = cached_ram_ptr[addr];
+								break;
+							case NDS_ABS_READ_ROM_LO:
+								m = cached_rom_lo_ptr[addr & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								m = cached_rom_hi_ptr[addr & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								m = cached_rom_lo_ptr[addr & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_AUDIO:
+								m = GT_AudioRamRead(addr);
+								break;
+							case NDS_ABS_READ_VIA:
+								m = system_state.VIA_regs[addr & 0xF];
+								break;
+							case NDS_ABS_READ_JOY:
+								m = GT_JoystickReadFast((uint8_t)addr);
+								break;
+							case NDS_ABS_READ_OPEN_BUS:
+								m = open_bus();
+								break;
+							default:
+								m = ReadBus(addr);
+								break;
+						}
 					} else {
-						A = ReadBus(addr);
+						m = ReadBus(addr);
 					}
+					A = m;
 					SetNZFast(A);
 					elapsedCycles = 4;
 					break;
@@ -2025,18 +2092,18 @@ td_op_slow:
 					break;
 				}
 				case 0xD0: { // BNE REL
-					int8_t off;
+					int16_t rel;
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					if (LIKELY(Sync == NULL)) {
 						const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-						off = (int8_t)dec.op1;
+						rel = dec.rel;
 						pc = (uint16_t)(pc + 1);
 					} else {
-						off = (int8_t)FetchByte();
+						rel = (int16_t)(int8_t)FetchByte();
 					}
 					if ((status & ZERO) == 0) {
 						const uint16_t oldPc = pc;
-						pc = (uint16_t)(pc + off);
+						pc = (uint16_t)(pc + rel);
 						elapsedCycles = (uint8_t)(3 + (((oldPc ^ pc) & 0xFF00) ? 1 : 0));
 					} else {
 						elapsedCycles = 2;
