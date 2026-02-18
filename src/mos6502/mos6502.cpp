@@ -1738,38 +1738,76 @@ td_op_slow:
 #endif
 			bool handledHot = false;
 			if (LIKELY(Sync == NULL)) {
+				auto hotReadAbs = [&](const NDSRomDecodeEntry& dec) -> uint8_t {
+					const uint16_t addr = dec.abs;
+					const uint8_t* const absPtr = dec.abs_ptr;
+					if (LIKELY(absPtr != nullptr)) {
+						return *absPtr;
+					}
+					switch (dec.abs_read_mode) {
+						case NDS_ABS_READ_RAM:
+							return cached_ram_ptr[addr];
+						case NDS_ABS_READ_AUDIO:
+							return GT_AudioRamRead(addr);
+						case NDS_ABS_READ_JOY:
+							return GT_JoystickReadFast((uint8_t)addr);
+						case NDS_ABS_READ_OPEN_BUS:
+							return open_bus();
+						default:
+							return ReadBus(addr);
+					}
+				};
+				auto hotProfile = [&](uint8_t hotOp, uint8_t hotCycles) {
+					opcode_profile_decim++;
+					if (opcode_profile_decim >= NDS_OPCODE_PROFILE_STRIDE) {
+						opcode_profile_decim = 0;
+						opcode_exec_count[hotOp] += NDS_OPCODE_PROFILE_STRIDE;
+						opcode_cycle_count[hotOp] += (uint32_t)hotCycles * NDS_OPCODE_PROFILE_STRIDE;
+					}
+				};
 				if (LIKELY(opcode == 0xAD)) { // LDA ABS
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
-					const uint16_t addr = dec.abs;
-					const uint8_t* const absPtr = dec.abs_ptr;
-					uint8_t m;
-					if (LIKELY(absPtr != nullptr)) {
-						m = *absPtr;
-					} else {
-						switch (dec.abs_read_mode) {
-							case NDS_ABS_READ_RAM:
-								m = cached_ram_ptr[addr];
-								break;
-							case NDS_ABS_READ_AUDIO:
-								m = GT_AudioRamRead(addr);
-								break;
-							case NDS_ABS_READ_JOY:
-								m = GT_JoystickReadFast((uint8_t)addr);
-								break;
-							case NDS_ABS_READ_OPEN_BUS:
-								m = open_bus();
-								break;
-							default:
-								m = ReadBus(addr);
-								break;
-						}
-					}
+					const uint8_t m = hotReadAbs(dec);
 					pc = (uint16_t)(pc + 2);
 					A = m;
 					SetNZFast(A);
 					elapsedCycles = 4;
 					handledHot = true;
+
+					// Aggressive fast loop for dominant AD/D0 streams.
+					// Keep the first AD accounted by the normal post-op path;
+					// account chained ops immediately to preserve timing/counters.
+					if (LIKELY(cycleMethod == CYCLE_COUNT) &&
+						LIKELY(irq_timer == 0) &&
+						LIKELY(!irq_line)) {
+						while ((cyclesRemaining - (int32_t)elapsedCycles) > 0) {
+							const NDSRomDecodeEntry& next = NDSGetRomDecode(pc);
+							if (LIKELY(next.opcode == 0xD0)) {
+								pc = (uint16_t)(pc + 2);
+								uint8_t extraCycles = 2;
+								if ((status & ZERO) == 0) {
+									pc = next.rel_target;
+									extraCycles = next.rel_taken_cycles;
+								}
+								run_pending_cycles += extraCycles;
+								cyclesRemaining -= extraCycles;
+								hotProfile(0xD0, extraCycles);
+								continue;
+							}
+							if (LIKELY(next.opcode == 0xAD)) {
+								A = hotReadAbs(next);
+								SetNZFast(A);
+								pc = (uint16_t)(pc + 3);
+								const uint8_t extraCycles = 4;
+								run_pending_cycles += extraCycles;
+								cyclesRemaining -= extraCycles;
+								hotProfile(0xAD, extraCycles);
+								continue;
+							}
+							break;
+						}
+					}
 				} else if (LIKELY(opcode == 0xD0)) { // BNE REL
 					const uint16_t opPc = (uint16_t)(pc - 1);
 					const NDSRomDecodeEntry& dec = NDSGetRomDecode(opPc);
