@@ -285,6 +285,8 @@ public:
 	void RunOptimized(
 		int32_t cycles,
 		uint64_t& cycleCount);
+	uint8_t HotReadBus(uint16_t address);
+	void HotWriteBus(uint16_t address, uint8_t value);
 #if defined(NDS_BUILD) && defined(ARM9)
 	void GetOpcodeProfileSnapshot(uint32_t outExec[256], uint64_t outCycles[256]) const;
 	void ResetOpcodeProfile();
