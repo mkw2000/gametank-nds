@@ -250,7 +250,8 @@ public:
 	uint16_t illegalOpcodeSrc;
 #if defined(NDS_BUILD) && defined(ARM9)
 	uint32_t opcode_exec_count[256];
-	uint64_t opcode_cycle_count[256];
+	uint32_t opcode_cycle_count[256];
+	uint32_t opcode_profile_decim = 0;
 #endif
 
 	// registers

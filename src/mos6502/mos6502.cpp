@@ -21,6 +21,10 @@ extern SystemState system_state;
 extern CartridgeState cartridge_state;
 extern RomType loadedRomType;
 extern uint16_t cached_ram_base;
+
+#ifndef NDS_OPCODE_PROFILE_STRIDE
+#define NDS_OPCODE_PROFILE_STRIDE 4u
+#endif
 #endif
 
 mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
@@ -36,6 +40,7 @@ mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
 		opcode_exec_count[i] = 0;
 		opcode_cycle_count[i] = 0;
 	}
+	opcode_profile_decim = 0;
 #endif
 
 	// fill jump table with ILLEGALs
@@ -1397,6 +1402,7 @@ void mos6502::ResetOpcodeProfile()
 		opcode_exec_count[i] = 0;
 		opcode_cycle_count[i] = 0;
 	}
+	opcode_profile_decim = 0;
 }
 #endif
 
@@ -1669,8 +1675,11 @@ void mos6502::Run(
 		// The ops extra cycles have been accounted for, it must now be reset
 		opExtraCycles = 0;
 #if defined(NDS_BUILD) && defined(ARM9)
-		opcode_exec_count[opcode]++;
-		opcode_cycle_count[opcode] += elapsedCycles;
+		opcode_profile_decim++;
+		if ((opcode_profile_decim & (NDS_OPCODE_PROFILE_STRIDE - 1u)) == 0u) {
+			opcode_exec_count[opcode] += NDS_OPCODE_PROFILE_STRIDE;
+			opcode_cycle_count[opcode] += (uint32_t)elapsedCycles * NDS_OPCODE_PROFILE_STRIDE;
+		}
 #endif
 
 		run_pending_cycles += elapsedCycles;
