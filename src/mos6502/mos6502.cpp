@@ -2041,10 +2041,24 @@ td_op_slow:
 						hi = FetchByte();
 					}
 					const uint16_t target = (uint16_t)(lo | (hi << 8));
-				pc--;
-				StackPush((pc >> 8) & 0xFF);
-				StackPush(pc & 0xFF);
-				pc = target;
+					const uint16_t ret = (uint16_t)(pc - 1);
+#if defined(NDS_BUILD) && defined(ARM9)
+					if (LIKELY(Sync == NULL)) {
+						uint16_t saddr = (uint16_t)(0x0100u + sp);
+						cached_ram_init_ptr[saddr] = true;
+						cached_ram_ptr[saddr] = (uint8_t)(ret >> 8);
+						sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+						saddr = (uint16_t)(0x0100u + sp);
+						cached_ram_init_ptr[saddr] = true;
+						cached_ram_ptr[saddr] = (uint8_t)(ret & 0xFF);
+						sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+					} else
+#endif
+					{
+						StackPush((uint8_t)(ret >> 8));
+						StackPush((uint8_t)(ret & 0xFF));
+					}
+					pc = target;
 					elapsedCycles = 6;
 					break;
 				}
@@ -2066,10 +2080,21 @@ td_op_slow:
 					break;
 				}
 				case 0x60: { // RTS
-					const uint16_t lo = StackPop();
-					const uint16_t hi = StackPop();
-					pc = (uint16_t)((hi << 8) | lo);
-				pc++;
+					uint16_t lo;
+					uint16_t hi;
+#if defined(NDS_BUILD) && defined(ARM9)
+					if (LIKELY(Sync == NULL)) {
+						sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+						lo = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+						sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+						hi = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+					} else
+#endif
+					{
+						lo = StackPop();
+						hi = StackPop();
+					}
+					pc = (uint16_t)(((hi << 8) | lo) + 1);
 					elapsedCycles = 6;
 					break;
 				}
