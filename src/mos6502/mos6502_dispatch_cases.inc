@@ -61,6 +61,7 @@ case 0X5D: { src = Addr_ABX(); Op_EOR(src); elapsedCycles = 4; break; }
 case 0X59: { src = Addr_ABY(); Op_EOR(src); elapsedCycles = 4; break; }
 case 0X52: { src = Addr_ZPI(); Op_EOR(src); elapsedCycles = 5; break; }
 case 0X1A: { src = Addr_IMP(); Op_INC_ACC(src); elapsedCycles = 2; break; }
+case 0XEE: { src = Addr_ABS(); Op_INC(src); elapsedCycles = 6; break; }
 case 0XE6: { src = Addr_ZER(); Op_INC(src); elapsedCycles = 5; break; }
 case 0XF6: { src = Addr_ZEX(); Op_INC(src); elapsedCycles = 6; break; }
 case 0XFE: { src = Addr_ABX(); Op_INC(src); elapsedCycles = 7; break; }
