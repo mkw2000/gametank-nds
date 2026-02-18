@@ -1458,15 +1458,32 @@ void mos6502::Reset()
 	return;
 }
 
-void ITCM_CODE mos6502::StackPush(uint8_t byte)
+void mos6502::StackPush(uint8_t byte)
 {
+#if defined(NDS_BUILD) && defined(ARM9)
+	if (LIKELY(Sync == NULL)) {
+		const uint16_t addr = (uint16_t)(0x0100u + sp);
+		cached_ram_init_ptr[addr] = true;
+		cached_ram_ptr[addr] = byte;
+		if (sp == 0x00) sp = 0xFF;
+		else sp--;
+		return;
+	}
+#endif
 	WriteBus(0x0100 + sp, byte);
 	if(sp == 0x00) sp = 0xFF;
 	else sp--;
 }
 
-uint8_t ITCM_CODE mos6502::StackPop()
+uint8_t mos6502::StackPop()
 {
+#if defined(NDS_BUILD) && defined(ARM9)
+	if (LIKELY(Sync == NULL)) {
+		if (sp == 0xFF) sp = 0x00;
+		else sp++;
+		return cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+	}
+#endif
 	if(sp == 0xFF) sp = 0x00;
 	else sp++;
 	return ReadBus(0x0100 + sp);
