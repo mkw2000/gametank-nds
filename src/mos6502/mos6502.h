@@ -8,6 +8,9 @@
 #pragma once
 #include <iostream>
 #include <stdint.h>
+#if defined(NDS_BUILD) && defined(ARM9)
+#include "nds_asm_cpu.h"
+#endif
 using namespace std;
 
 #define NEGATIVE  0x80

@@ -1658,6 +1658,56 @@ void mos6502::Run(
 
 	while((cyclesRemaining > 0) && !illegalOpcode)
 	{
+#if defined(NDS_BUILD) && defined(ARM9)
+		if (LIKELY(Sync == NULL && !waiting && !freeze && !irq_line)) {
+			// Fast path: run as many instructions as possible in assembly
+			int32_t asm_cycles = cyclesRemaining;
+			if (irq_timer > 0 && (int32_t)irq_timer < asm_cycles)
+				asm_cycles = (int32_t)irq_timer;
+
+			AsmCpuState asmState;
+			asmState.A = A; asmState.X = X; asmState.Y = Y; asmState.sp = sp;
+			asmState.status = status; asmState.pc = pc;
+			asmState.cycles_remaining = asm_cycles;
+			asmState.exit_reason = 0;
+
+			mos6502_run_asm(&asmState, cached_ram_ptr, cached_rom_lo_ptr,
+				cached_rom_hi_ptr, cached_ram_init_ptr,
+				system_state.VIA_regs);
+
+			// Write back CPU state
+			A = asmState.A; X = asmState.X; Y = asmState.Y; sp = asmState.sp;
+			status = asmState.status; pc = asmState.pc;
+			int32_t consumed = asm_cycles - asmState.cycles_remaining;
+			cyclesRemaining -= consumed;
+			run_pending_cycles += consumed;
+
+			// Handle IRQ timer
+			if (irq_timer > 0) {
+				if ((uint32_t)consumed >= irq_timer) {
+					irq_timer = 0;
+					if (!irq_gate || *irq_gate) {
+						irq_line = true;
+						IRQ();
+					}
+				} else {
+					irq_timer -= consumed;
+				}
+			}
+
+			if (asmState.exit_reason == 0) continue;  // cycles exhausted
+			if (asmState.exit_reason == 1) {
+				// Unhandled opcode: pc points to it, fetch and fall through
+				opcode = FetchByte();
+				goto nds_asm_fallthrough;
+			}
+			if (asmState.exit_reason == 2) {
+				// I/O access: pc points to the instruction, re-execute in C++
+				opcode = FetchByte();
+				goto nds_asm_fallthrough;
+			}
+		}
+#endif
 		if (UNLIKELY(waiting)) {
 			if (UNLIKELY(irq_line)) {
 				waiting = false;
@@ -1713,6 +1763,9 @@ void mos6502::Run(
 			break;
 		}
 
+#if defined(NDS_BUILD) && defined(ARM9)
+nds_asm_fallthrough:
+#endif
 		// Direct opcode dispatch on ARM9 avoids per-instruction member function pointer indirection.
 #if defined(NDS_BUILD) && defined(ARM9)
 #if NDS_USE_THREADED_DISPATCH

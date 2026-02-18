@@ -122,6 +122,7 @@ $(OUTPUT).elf: $(OFILES)
 blitter.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 mos6502.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 gte.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+mos6502_hot_arm.o: ASFLAGS += -marm -mthumb-interwork
 
 -include $(DEPENDS)
 
