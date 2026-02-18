@@ -1027,6 +1027,7 @@ mos6502::mos6502(BusRead r, BusWrite w, CPUEvent stp, BusRead sync)
 inline uint8_t mos6502::ReadBus(uint16_t address)
 {
 #if defined(NDS_BUILD) && defined(ARM9)
+	if (LIKELY(Sync == NULL)) {
 	// GameTank map fast path:
 	// 0000-1FFF: RAM, 2008/2009: controller, 2800-2FFF: VIA mirror,
 	// 3000-3FFF: audio RAM, 4000-7FFF: VDMA, 8000-FFFF: cart ROM/flash.
@@ -1067,6 +1068,7 @@ inline uint8_t mos6502::ReadBus(uint16_t address)
 		return GT_JoystickReadFast((uint8_t)address);
 	}
 	return open_bus();
+	}
 #endif
 	FlushRunCycles();
 	return (*Read)(address);
@@ -1075,6 +1077,7 @@ inline uint8_t mos6502::ReadBus(uint16_t address)
 inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 {
 #if defined(NDS_BUILD) && defined(ARM9)
+	if (LIKELY(Sync == NULL)) {
 	if(address < 0x2000) {
 		const uint16_t idx = (uint16_t)(cached_ram_base | address);
 		system_state.ram_initialized[idx] = true;
@@ -1100,6 +1103,7 @@ inline void mos6502::WriteBus(uint16_t address, uint8_t value)
 		system_state.VIA_regs[viaReg] = value;
 		return;
 	}
+	}
 #endif
 	FlushRunCycles();
 	(*Write)(address, value);
@@ -1109,6 +1113,7 @@ inline uint8_t mos6502::FetchByte()
 {
 	const uint16_t address = pc++;
 #if defined(NDS_BUILD) && defined(ARM9)
+	if (LIKELY(Sync == NULL)) {
 	// Instruction stream is usually ROM; keep this path as lean as possible.
 	if (address & 0x8000) {
 		if (loadedRomType == RomType::FLASH2M) {
@@ -1128,6 +1133,7 @@ inline uint8_t mos6502::FetchByte()
 
 	if (address < 0x2000) {
 		return system_state.ram[cached_ram_base | address];
+	}
 	}
 #endif
 	return ReadBus(address);
