@@ -39,7 +39,10 @@ CPPFILES_EXPLICIT := \
 	emulator_config.cpp \
 	font.cpp \
 	timekeeper.cpp \
-	mos6502.cpp
+	mos6502.cpp \
+	dynarec.cpp \
+	dynarec_emitter.cpp \
+	dynarec_cpu.cpp
 
 SFILES_EXPLICIT := \
 	nds_blit_arm.s \
@@ -122,6 +125,9 @@ $(OUTPUT).elf: $(OFILES)
 blitter.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 mos6502.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 gte.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+dynarec.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+dynarec_emitter.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
+dynarec_cpu.o: CXXFLAGS += -marm -mthumb-interwork -fno-lto
 mos6502_hot_arm.o: ASFLAGS += -marm -mthumb-interwork
 
 -include $(DEPENDS)

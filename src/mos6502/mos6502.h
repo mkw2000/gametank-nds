@@ -306,4 +306,19 @@ public:
 	void ResetCacheProfile();
 #endif
 	void Freeze();
+
+	// Accessor methods for dynarec
+	uint8_t GetA() const { return A; }
+	uint8_t GetX() const { return X; }
+	uint8_t GetY() const { return Y; }
+	uint8_t GetSP() const { return sp; }
+	uint16_t GetPC() const { return pc; }
+	uint8_t GetStatus() const { return status; }
+
+	void SetA(uint8_t val) { A = val; }
+	void SetX(uint8_t val) { X = val; }
+	void SetY(uint8_t val) { Y = val; }
+	void SetSP(uint8_t val) { sp = val; }
+	void SetPC(uint16_t val) { pc = val; }
+	void SetStatus(uint8_t val) { status = val; }
 };

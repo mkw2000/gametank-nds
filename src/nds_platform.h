@@ -130,4 +130,34 @@ static inline bool file_exists(const char* path) {
 #define NDS_SCREEN_WIDTH  256
 #define NDS_SCREEN_HEIGHT 192
 
+//=============================================================================
+// ARM9 Cache Control (CP15 operations)
+//=============================================================================
+#if defined(ARM9)
+
+// Inline assembly for CP15 cache operations
+static inline void CP15_CleanAndInvalidateDCache(void) {
+    // Clean and invalidate entire D-cache
+    // This is a simplified version - real implementation would loop through cache lines
+    __asm volatile("mov r0, #0" ::: "r0");
+    __asm volatile("mcr p15, 0, r0, c7, c14, 0" ::: "r0");  // Clean and invalidate D-cache
+}
+
+static inline void CP15_InvalidateICache(void) {
+    // Invalidate entire I-cache
+    __asm volatile("mcr p15, 0, %0, c7, c5, 0" : : "r" (0));
+}
+
+static inline void CP15_DrainWriteBuffer(void) {
+    // Drain write buffer
+    __asm volatile("mcr p15, 0, %0, c7, c10, 4" : : "r" (0));
+}
+
+// Memory barrier
+static inline void MemoryBarrier(void) {
+    __asm volatile("dsb" ::: "memory");
+}
+
+#endif // ARM9
+
 #endif // NDS_BUILD
