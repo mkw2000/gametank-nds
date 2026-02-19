@@ -82,6 +82,9 @@ void DebugFilesystem() {
 #endif
 
 #include "mos6502/mos6502.h"
+#if defined(NDS_BUILD) && defined(ARM9)
+#include "mos6502/dynarec.h"
+#endif
 
 #if !defined(NDS_BUILD) && !defined(WASM_BUILD)
 #include "devtools/memory_map.h"
@@ -282,6 +285,9 @@ static inline void UpdateRomReadCache() {
 	if (++cached_rom_decode_epoch == 0) {
 		cached_rom_decode_epoch = 1;
 	}
+#if defined(NDS_BUILD) && defined(ARM9)
+	Dynarec::InvalidateAll();
+#endif
 	// Upper 16KB window is fixed to the flash trailer region for FLASH2M variants.
 	cached_rom_hi_ptr = &cartridge_state.rom[0x1FC000];
 	switch (loadedRomType) {

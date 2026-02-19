@@ -3,6 +3,7 @@
 #include "SDL_inc.h"
 #if defined(NDS_BUILD) && defined(ARM9)
 #include "system_state.h"
+#include "dynarec_cpu.h"
 #endif
 
 #ifndef ITCM_CODE
@@ -17,6 +18,9 @@
 #endif
 
 #define NDS_USE_THREADED_DISPATCH 0
+
+// Global active CPU pointer for dynarec
+mos6502* g_activeCPU = nullptr;
 
 #if defined(NDS_BUILD) && defined(ARM9)
 extern SystemState system_state;
@@ -1663,6 +1667,7 @@ void mos6502::Run(
 	uint64_t& cycleCount,
 	CycleMethod cycleMethod
 ) {
+	g_activeCPU = this;
 	run_cycle_target = &cycleCount;
 	run_pending_cycles = 0;
 
@@ -1704,6 +1709,23 @@ void mos6502::Run(
 		} else if (UNLIKELY(irq_line)) {
 			IRQ();
 		}
+
+#if defined(NDS_BUILD) && defined(ARM9)
+		// Try dynarec first for straight-line code without pending IRQs
+		if (LIKELY(Sync == NULL && !waiting && !freeze && !irq_line && irq_timer == 0)) {
+			if (Dynarec::CanUseDynarec()) {
+				int32_t dynarecCycles = Dynarec::RunDynarec(cyclesRemaining);
+				if (dynarecCycles > 0) {
+					cyclesRemaining -= dynarecCycles;
+					run_pending_cycles += dynarecCycles;
+					// Re-check state after dynarec run
+					if (cyclesRemaining <= 0 || freeze || waiting) {
+						continue;
+					}
+				}
+			}
+		}
+#endif
 
 		// fetch
 #if defined(NDS_BUILD) && defined(ARM9)
