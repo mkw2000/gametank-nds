@@ -1385,9 +1385,22 @@ static void NDSPerfMaybePrint() {
 			(unsigned long)(topOpExec[0] > 99999 ? 99999 : topOpExec[0]),
 			(unsigned long)(topOpExec[1] > 99999 ? 99999 : topOpExec[1]),
 			(unsigned long)(topOpExec[2] > 99999 ? 99999 : topOpExec[2]));
+		// Cache hit/miss stats for AD and D0
+		uint32_t hit_ad = 0, miss_ad = 0, hit_d0 = 0, miss_d0 = 0, last_hits = 0;
+		if (cpu_core) {
+			cpu_core->GetCacheProfile(hit_ad, miss_ad, hit_d0, miss_d0, last_hits);
+		}
+		uint32_t total_ad = hit_ad + miss_ad;
+		uint32_t total_d0 = hit_d0 + miss_d0;
+		uint32_t pct_ad = total_ad ? (hit_ad * 100 / total_ad) : 0;
+		uint32_t pct_d0 = total_d0 ? (hit_d0 * 100 / total_d0) : 0;
+		printf("CH:%2lu%%/%2lu%% L:%lu ad:%lu     \n",
+			(unsigned long)pct_ad, (unsigned long)pct_d0,
+			(unsigned long)last_hits, (unsigned long)total_ad);
 	} else {
 		printf("OP:--/-- --/-- --/--        \n");
 		printf("EX:    0/    0/    0         \n");
+		printf("CH:--/-- ad:0 d0:0           \n");
 	}
 
 	if (ndsPerfLog.enabled) {
@@ -1418,13 +1431,25 @@ static void NDSPerfMaybePrint() {
 					(unsigned int)topOps[0], (unsigned long)p0,
 					(unsigned int)topOps[1], (unsigned long)p1,
 					(unsigned int)topOps[2], (unsigned long)p2);
-				fprintf(f, "EX:%5lu/%5lu/%5lu\n\n",
+				fprintf(f, "EX:%5lu/%5lu/%5lu\n",
 					(unsigned long)(topOpExec[0] > 99999 ? 99999 : topOpExec[0]),
 					(unsigned long)(topOpExec[1] > 99999 ? 99999 : topOpExec[1]),
 					(unsigned long)(topOpExec[2] > 99999 ? 99999 : topOpExec[2]));
+				uint32_t hit_ad = 0, miss_ad = 0, hit_d0 = 0, miss_d0 = 0, last_hits = 0;
+				if (cpu_core) {
+					cpu_core->GetCacheProfile(hit_ad, miss_ad, hit_d0, miss_d0, last_hits);
+				}
+				uint32_t total_ad = hit_ad + miss_ad;
+				uint32_t total_d0 = hit_d0 + miss_d0;
+				uint32_t pct_ad = total_ad ? (hit_ad * 100 / total_ad) : 0;
+				uint32_t pct_d0 = total_d0 ? (hit_d0 * 100 / total_d0) : 0;
+				fprintf(f, "CH:%2lu%%/%2lu%% L:%lu ad:%lu\n\n",
+					(unsigned long)pct_ad, (unsigned long)pct_d0,
+					(unsigned long)last_hits, (unsigned long)total_ad);
 			} else {
 				fprintf(f, "OP:--/-- --/-- --/--\n");
-				fprintf(f, "EX:    0/    0/    0\n\n");
+				fprintf(f, "EX:    0/    0/    0\n");
+				fprintf(f, "CH:--/-- L:0 ad:0\n\n");
 			}
 			fclose(f);
 		} else if (!ndsPerfLog.writeFailed) {

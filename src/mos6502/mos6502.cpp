@@ -1538,6 +1538,10 @@ void mos6502::Reset()
 	illegalOpcode = false;
 	waiting = false;
 
+#if defined(NDS_BUILD) && defined(ARM9)
+	ResetCacheProfile();
+#endif
+
 	return;
 }
 
@@ -1636,6 +1640,22 @@ void mos6502::ResetOpcodeProfile()
 	}
 	opcode_profile_decim = 0;
 }
+
+void mos6502::GetCacheProfile(uint32_t& hit_ad, uint32_t& miss_ad, uint32_t& hit_d0, uint32_t& miss_d0, uint32_t& last_hits) const
+{
+	hit_ad = cache_hit_ad;
+	miss_ad = cache_miss_ad;
+	hit_d0 = cache_hit_d0;
+	miss_d0 = cache_miss_d0;
+	last_hits = last_entry_hits;
+}
+
+void mos6502::ResetCacheProfile()
+{
+	cache_hit_ad = cache_miss_ad = 0;
+	cache_hit_d0 = cache_miss_d0 = 0;
+	last_entry_hits = 0;
+}
 #endif
 
 void mos6502::Run(
@@ -1658,9 +1678,6 @@ void mos6502::Run(
 
 	while((cyclesRemaining > 0) && !illegalOpcode)
 	{
-		/* ARM asm dispatch loop disabled: the C++ decode cache avoids slow
-		   EWRAM ROM reads on cache hits, making it faster than the asm loop
-		   which reads ROM for every opcode/operand fetch. */
 		if (UNLIKELY(waiting)) {
 			if (UNLIKELY(irq_line)) {
 				waiting = false;
@@ -1687,6 +1704,7 @@ void mos6502::Run(
 		} else if (UNLIKELY(irq_line)) {
 			IRQ();
 		}
+
 		// fetch
 #if defined(NDS_BUILD) && defined(ARM9)
 		// Try decode cache first: if the entry for this PC is valid,
@@ -1765,12 +1783,26 @@ td_op_slow:
 			{ // scope for handledHot (threaded dispatch gotos skip this)
 			bool handledHot = false;
 			if (LIKELY(Sync == NULL)) {
-				if (LIKELY(opcode == 0xAD)) { // LDA ABS - fully inlined
+				// Hot path chain ordered by frequency from profiling
+				// Profile shows: AD > D0 > 60/8D > 20 > others
+				if (LIKELY(opcode == 0xAD)) { // LDA ABS - #1 most frequent
 					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
-					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
-					if (UNLIKELY(entry.tag != expected_tag)) {
+					uint16_t addr;
+					const uint8_t* absPtr;
+					uint8_t readMode;
+					// Try last-entry cache first (avoids hash computation on tight loops)
+					if (LIKELY(opPc == last_ad_pc)) {
+						addr = last_ad_abs;
+						absPtr = last_ad_ptr;
+						readMode = last_ad_mode;
+						last_entry_hits++;
+						cache_hit_ad++;
+					} else {
+						NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+						const uint32_t epoch = cached_rom_decode_epoch;
+						const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+						if (UNLIKELY(entry.tag != expected_tag)) {
+						cache_miss_ad++;
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
@@ -1797,15 +1829,24 @@ td_op_slow:
 							default:
 								entry.abs_ptr = nullptr;
 								break;
+							}
+						} else {
+							cache_hit_ad++;
 						}
+						addr = entry.abs;
+						absPtr = entry.abs_ptr;
+						readMode = entry.abs_read_mode;
+						// Update last-entry cache
+						last_ad_pc = opPc;
+						last_ad_abs = addr;
+						last_ad_ptr = absPtr;
+						last_ad_mode = readMode;
 					}
-					const uint16_t addr = entry.abs;
-					const uint8_t* const absPtr = entry.abs_ptr;
 					uint8_t m;
 					if (LIKELY(absPtr != nullptr)) {
 						m = *absPtr;
 					} else {
-						switch (entry.abs_read_mode) {
+						switch (readMode) {
 							case NDS_ABS_READ_RAM: m = cached_ram_ptr[addr]; break;
 							case NDS_ABS_READ_AUDIO: m = GT_AudioRamRead(addr); break;
 							case NDS_ABS_READ_JOY: m = GT_JoystickReadFast((uint8_t)addr); break;
@@ -1825,6 +1866,7 @@ td_op_slow:
 					const uint32_t epoch = cached_rom_decode_epoch;
 					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
 					if (UNLIKELY(entry.tag != expected_tag)) {
+						cache_miss_d0++;
 						entry.tag = expected_tag;
 						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
 						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
@@ -1852,6 +1894,8 @@ td_op_slow:
 								entry.abs_ptr = nullptr;
 								break;
 						}
+					} else {
+						cache_hit_d0++;
 					}
 					pc = (uint16_t)(opPc + 2);
 					if ((status & ZERO) == 0) {
@@ -1860,29 +1904,6 @@ td_op_slow:
 					} else {
 						elapsedCycles = 2;
 					}
-					handledHot = true;
-				} else if (LIKELY(opcode == 0xA5)) { // LDA ZER - fully inlined
-					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
-					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
-					if (UNLIKELY(entry.tag != expected_tag)) {
-						entry.tag = expected_tag;
-						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
-						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
-						entry.op2 = 0;
-						entry.abs = entry.op1;
-						entry.abs_read_mode = NDS_ABS_READ_RAM; // ZER always reads from RAM
-						entry.abs_ptr = nullptr;
-						entry.rel = (int16_t)(int8_t)entry.op1;
-						const uint16_t rel_base = (uint16_t)(opPc + 2);
-						entry.rel_target = (uint16_t)(rel_base + entry.rel);
-						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
-					}
-					A = cached_ram_ptr[entry.op1];
-					SetNZFast(A);
-					pc = (uint16_t)(pc + 1);
-					elapsedCycles = 3;
 					handledHot = true;
 				} else if (LIKELY(opcode == 0x8D)) { // STA ABS - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
@@ -1940,6 +1961,61 @@ td_op_slow:
 					}
 					pc = (uint16_t)(pc + 2);
 					elapsedCycles = 4;
+					handledHot = true;
+				} else if (opcode == 0x60) { // RTS - fully inlined
+					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+					const uint16_t lo = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
+					const uint16_t hi = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
+					pc = (uint16_t)(((hi << 8) | lo) + 1);
+					elapsedCycles = 6;
+					handledHot = true;
+				} else if (opcode == 0x20) { // JSR ABS - fully inlined
+					const uint16_t opPc = (uint16_t)(pc - 1);
+					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
+					const uint32_t epoch = cached_rom_decode_epoch;
+					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
+					if (UNLIKELY(entry.tag != expected_tag)) {
+						entry.tag = expected_tag;
+						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
+						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
+						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
+						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
+						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
+						entry.rel = (int16_t)(int8_t)entry.op1;
+						const uint16_t rel_base = (uint16_t)(opPc + 2);
+						entry.rel_target = (uint16_t)(rel_base + entry.rel);
+						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
+						switch (entry.abs_read_mode) {
+							case NDS_ABS_READ_ROM_LO:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_HI:
+								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
+								break;
+							case NDS_ABS_READ_ROM_LINEAR:
+								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
+								break;
+							case NDS_ABS_READ_VIA:
+								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
+								break;
+							default:
+								entry.abs_ptr = nullptr;
+								break;
+						}
+					}
+					pc = (uint16_t)(opPc + 3);
+					const uint16_t ret = (uint16_t)(pc - 1);
+					uint16_t saddr = (uint16_t)(0x0100u + sp);
+					cached_ram_init_ptr[saddr] = true;
+					cached_ram_ptr[saddr] = (uint8_t)(ret >> 8);
+					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+					saddr = (uint16_t)(0x0100u + sp);
+					cached_ram_init_ptr[saddr] = true;
+					cached_ram_ptr[saddr] = (uint8_t)(ret & 0xFF);
+					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
+					pc = entry.abs;
+					elapsedCycles = 6;
 					handledHot = true;
 				} else if (opcode == 0xA9) { // LDA IMM - fully inlined
 					const uint16_t opPc = (uint16_t)(pc - 1);
@@ -2064,61 +2140,6 @@ td_op_slow:
 					}
 					pc = entry.abs;
 					elapsedCycles = 3;
-					handledHot = true;
-				} else if (opcode == 0x20) { // JSR ABS - fully inlined
-					const uint16_t opPc = (uint16_t)(pc - 1);
-					NDSRomDecodeEntry& entry = g_nds_rom_decode[opPc & NDS_DECODE_CACHE_MASK];
-					const uint32_t epoch = cached_rom_decode_epoch;
-					const uint32_t expected_tag = (epoch << 16) | (opPc & ~NDS_DECODE_CACHE_MASK);
-					if (UNLIKELY(entry.tag != expected_tag)) {
-						entry.tag = expected_tag;
-						if (!NDSMainReadFast(opPc, entry.opcode)) entry.opcode = 0xFF;
-						if (!NDSMainReadFast((uint16_t)(opPc + 1), entry.op1)) entry.op1 = 0;
-						if (!NDSMainReadFast((uint16_t)(opPc + 2), entry.op2)) entry.op2 = 0;
-						entry.abs = (uint16_t)(entry.op1 | (entry.op2 << 8));
-						entry.abs_read_mode = NDSClassifyAbsReadMode(entry.abs);
-						entry.rel = (int16_t)(int8_t)entry.op1;
-						const uint16_t rel_base = (uint16_t)(opPc + 2);
-						entry.rel_target = (uint16_t)(rel_base + entry.rel);
-						entry.rel_taken_cycles = (uint8_t)(3 + (((rel_base ^ entry.rel_target) & 0xFF00) ? 1 : 0));
-						switch (entry.abs_read_mode) {
-							case NDS_ABS_READ_ROM_LO:
-								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & 0x3FFF];
-								break;
-							case NDS_ABS_READ_ROM_HI:
-								entry.abs_ptr = &cached_rom_hi_ptr[entry.abs & 0x3FFF];
-								break;
-							case NDS_ABS_READ_ROM_LINEAR:
-								entry.abs_ptr = &cached_rom_lo_ptr[entry.abs & cached_rom_linear_mask];
-								break;
-							case NDS_ABS_READ_VIA:
-								entry.abs_ptr = &system_state.VIA_regs[entry.abs & 0xF];
-								break;
-							default:
-								entry.abs_ptr = nullptr;
-								break;
-						}
-					}
-					pc = (uint16_t)(opPc + 3);
-					const uint16_t ret = (uint16_t)(pc - 1);
-					uint16_t saddr = (uint16_t)(0x0100u + sp);
-					cached_ram_init_ptr[saddr] = true;
-					cached_ram_ptr[saddr] = (uint8_t)(ret >> 8);
-					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
-					saddr = (uint16_t)(0x0100u + sp);
-					cached_ram_init_ptr[saddr] = true;
-					cached_ram_ptr[saddr] = (uint8_t)(ret & 0xFF);
-					sp = (sp == 0x00) ? 0xFF : (uint8_t)(sp - 1);
-					pc = entry.abs;
-					elapsedCycles = 6;
-					handledHot = true;
-				} else if (opcode == 0x60) { // RTS - fully inlined
-					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
-					const uint16_t lo = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
-					sp = (sp == 0xFF) ? 0x00 : (uint8_t)(sp + 1);
-					const uint16_t hi = cached_ram_ptr[(uint16_t)(0x0100u + sp)];
-					pc = (uint16_t)(((hi << 8) | lo) + 1);
-					elapsedCycles = 6;
 					handledHot = true;
 				}
 			}

@@ -257,6 +257,15 @@ public:
 	uint32_t opcode_exec_count[256];
 	uint32_t opcode_cycle_count[256];
 	uint32_t opcode_profile_decim = 0;
+	// Decode cache hit/miss counters for hot opcodes
+	uint32_t cache_hit_ad = 0, cache_miss_ad = 0;
+	uint32_t cache_hit_d0 = 0, cache_miss_d0 = 0;
+	// Last-entry cache for AD (avoids hash lookup on tight loops)
+	uint16_t last_ad_pc = 0xFFFF;
+	uint16_t last_ad_abs = 0;
+	uint8_t last_ad_mode = 0;
+	const uint8_t* last_ad_ptr = nullptr;
+	uint32_t last_entry_hits = 0;
 #endif
 
 	// registers
@@ -293,6 +302,8 @@ public:
 #if defined(NDS_BUILD) && defined(ARM9)
 	void GetOpcodeProfileSnapshot(uint32_t outExec[256], uint64_t outCycles[256]) const;
 	void ResetOpcodeProfile();
+	void GetCacheProfile(uint32_t& hit_ad, uint32_t& miss_ad, uint32_t& hit_d0, uint32_t& miss_d0, uint32_t& last_hits) const;
+	void ResetCacheProfile();
 #endif
 	void Freeze();
 };
