@@ -135,6 +135,10 @@ static void HandlePxiMessage(uint32_t msg) {
 }
 
 static void FillAudioChunk(int16_t* out, int sampleCount) {
+    if (!s_acp.running) {
+        memset(out, 0, sampleCount * sizeof(int16_t));
+        return;
+    }
     for (int i = 0; i < sampleCount; i++) {
         int sample = ((int)s_acp.dacReg - 128) * s_acp.volume;
         if (s_acp.isMuted || s_acp.isPaused) {

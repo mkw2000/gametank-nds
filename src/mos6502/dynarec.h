@@ -8,7 +8,7 @@
 namespace Dynarec {
 
 // Configuration
-constexpr size_t CODE_BUFFER_SIZE = 8 * 1024;   // 8KB in ITCM
+constexpr size_t CODE_BUFFER_SIZE = 4 * 1024;   // 4KB - placed in main RAM for now
 constexpr int MAX_BLOCK_SIZE = 64;              // Max instructions per block
 constexpr int MAX_BLOCK_CYCLES = 200;           // Max cycles per block
 
@@ -83,6 +83,8 @@ struct Stats {
     uint32_t compile_bytes_used;
     uint32_t compile_bytes_total;
     uint32_t fallback_count;
+    uint8_t  last_fail_opcode;    // Opcode that caused most recent fallback
+    uint16_t last_fail_pc;        // PC where most recent fallback happened
 };
 
 Stats GetStats();

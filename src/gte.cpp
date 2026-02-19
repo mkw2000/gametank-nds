@@ -84,6 +84,7 @@ void DebugFilesystem() {
 #include "mos6502/mos6502.h"
 #if defined(NDS_BUILD) && defined(ARM9)
 #include "mos6502/dynarec.h"
+#include "mos6502/dynarec_cpu.h"
 #endif
 
 #if !defined(NDS_BUILD) && !defined(WASM_BUILD)
@@ -161,6 +162,11 @@ GameConfig* gameconfig;
 
 bool vsyncProfileArmed = false;
 bool vsyncProfileRunning = false;
+
+#ifdef NDS_BUILD
+bool enableVSync = true;
+bool enableAudio = true;
+#endif
 
 bool showMenu = false;
 bool menuOpening = false;
@@ -1403,6 +1409,16 @@ static void NDSPerfMaybePrint() {
 		printf("CH:%2lu%%/%2lu%% L:%lu ad:%lu     \n",
 			(unsigned long)pct_ad, (unsigned long)pct_d0,
 			(unsigned long)last_hits, (unsigned long)total_ad);
+#if defined(NDS_BUILD) && defined(ARM9)
+		{
+			Dynarec::Stats ds = Dynarec::GetStats();
+			printf("DR:c%lu x%lu f%lu op%02X    \n",
+				(unsigned long)ds.blocks_compiled,
+				(unsigned long)ds.blocks_executed,
+				(unsigned long)ds.fallback_count,
+				(unsigned int)ds.last_fail_opcode);
+		}
+#endif
 	} else {
 		printf("OP:--/-- --/-- --/--        \n");
 		printf("EX:    0/    0/    0         \n");
@@ -2105,23 +2121,9 @@ EM_BOOL mainloop(double time, void* userdata) {
 			}
 		} else {
 #ifdef NDS_BUILD
-        // DEBUG: R toggles Audio, L toggles VSync
-        scanKeys();
-        uint32_t keys = keysDown();
-        static bool enableVSync = true;
-        static bool enableAudio = true;
-        
-        if (keys & KEY_L) {
-            enableVSync = !enableVSync;
-        }
-        if (keys & KEY_R) {
-            enableAudio = !enableAudio;
-            AudioCoprocessor::singleton_acp_state->running = enableAudio;
-        }
-
-        if (enableVSync) swiWaitForVBlank();
+			swiWaitForVBlank();
 #else
-				SDL_Delay(16);
+			SDL_Delay(16);
 #endif
 		}
 #ifdef NDS_BUILD
@@ -2154,6 +2156,19 @@ EM_BOOL mainloop(double time, void* userdata) {
 		/*if (!ndsMenuOpen && (ndsDown & (KEY_L | KEY_R))) {
 			ndsMenuOpen_();
 		}*/
+
+		// DEBUG: R toggles Audio, L toggles VSync
+		if (ndsDown & KEY_L) {
+			enableVSync = !enableVSync;
+			printf("VSync: %s\n", enableVSync ? "ON" : "OFF");
+		}
+		if (ndsDown & KEY_R) {
+			enableAudio = !enableAudio;
+			if (AudioCoprocessor::singleton_acp_state) {
+				AudioCoprocessor::singleton_acp_state->running = enableAudio;
+			}
+			printf("Audio: %s\n", enableAudio ? "ON" : "OFF");
+		}
 
 		if (ndsMenuOpen) {
 			ndsMenuHandleInput();
@@ -2516,7 +2531,7 @@ int main(int argC, char* argV[]) {
 			ndsFrameCounter = f;
 			mainloop(0, NULL);
 		}
-		swiWaitForVBlank();
+		if (enableVSync) swiWaitForVBlank();
 	}
 #elif defined(WASM_BUILD)
 	emscripten_request_animation_frame_loop(mainloop, 0);

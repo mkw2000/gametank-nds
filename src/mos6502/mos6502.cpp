@@ -1711,14 +1711,29 @@ void mos6502::Run(
 		}
 
 #if defined(NDS_BUILD) && defined(ARM9)
-		// Try dynarec first for straight-line code without pending IRQs
-		if (LIKELY(Sync == NULL && !waiting && !freeze && !irq_line && irq_timer == 0)) {
+		// Try dynarec — allow running even with irq_timer pending
+		if (LIKELY(Sync == NULL && !waiting && !freeze && !irq_line)) {
 			if (Dynarec::CanUseDynarec()) {
-				int32_t dynarecCycles = Dynarec::RunDynarec(cyclesRemaining);
+				// Limit dynarec to min(cyclesRemaining, irq_timer) so we don't overshoot IRQ
+				int32_t dynarecBudget = cyclesRemaining;
+				if (irq_timer > 0 && (int32_t)irq_timer < dynarecBudget) {
+					dynarecBudget = (int32_t)irq_timer;
+				}
+				int32_t dynarecCycles = Dynarec::RunDynarec(dynarecBudget);
 				if (dynarecCycles > 0) {
 					cyclesRemaining -= dynarecCycles;
 					run_pending_cycles += dynarecCycles;
-					// Re-check state after dynarec run
+					// Tick down irq_timer
+					if (irq_timer > 0) {
+						if ((uint32_t)dynarecCycles >= irq_timer) {
+							irq_timer = 0;
+							if ((irq_gate == NULL) || (*irq_gate)) {
+								irq_line = true;
+							}
+						} else {
+							irq_timer -= dynarecCycles;
+						}
+					}
 					if (cyclesRemaining <= 0 || freeze || waiting) {
 						continue;
 					}

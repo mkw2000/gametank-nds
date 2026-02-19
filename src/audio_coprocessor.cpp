@@ -180,6 +180,11 @@ void AudioCoprocessor::TickNDSAudio() {
         return;
     }
 
+    // Early exit if audio is disabled (for performance testing)
+    if (!state.running) {
+        return;
+    }
+
     ACP_QueueRamSync(&state);
 
     // Forward runtime controls (volume/mute/pause) to ARM7 when changed.
