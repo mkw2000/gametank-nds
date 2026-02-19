@@ -133,11 +133,15 @@ public:
     // Load 16-bit immediate using MOV + ORR (ARMv5TE compatible)
     void LoadImm16(int rd, uint16_t val);
 
-    // Load/store
+    // Load/store with immediate offset
     void Emit_LDR_IMM(int rt, int rn, uint16_t offset);
     void Emit_LDRB_IMM(int rt, int rn, uint16_t offset);
     void Emit_STR_IMM(int rt, int rn, uint16_t offset);
     void Emit_STRB_IMM(int rt, int rn, uint16_t offset);
+
+    // Load/store with register offset
+    void Emit_LDRB_REG(int rd, int rn, int rm);
+    void Emit_STRB_REG(int rd, int rn, int rm);
 
     // Arithmetic
     void Emit_ADD_IMM(int rd, int rn, uint8_t imm, bool set_flags = false);
@@ -161,6 +165,7 @@ public:
     // Block prologue/epilogue
     void Emit_Prologue();
     void Emit_Epilogue(uint16_t exit_pc);
+    void Emit_Epilogue_DynamicPC(int pc_reg);  // pc_reg must NOT be REG_SCRATCH0
 
     // Lazy flag helpers
     void Emit_UpdateNZ(int reg);  // MOV r7, reg (just copy result to NZ register)

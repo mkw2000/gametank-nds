@@ -52,6 +52,18 @@ void Emitter::Emit_STRB_IMM(int rt, int rn, uint16_t offset) {
     Emit(ARM_COND(COND_AL) | ARM_STR_IMM(rt, rn, offset, true));
 }
 
+// LDRB Rd, [Rn, Rm] - register offset
+void Emitter::Emit_LDRB_REG(int rd, int rn, int rm) {
+    Emit(ARM_COND(COND_AL) | (0x1 << 26) | (1 << 25) | (1 << 24) | (1 << 23) |
+         (1 << 22) | (0 << 21) | (1 << 20) | (rn << 16) | (rd << 12) | rm);
+}
+
+// STRB Rd, [Rn, Rm] - register offset
+void Emitter::Emit_STRB_REG(int rd, int rn, int rm) {
+    Emit(ARM_COND(COND_AL) | (0x1 << 26) | (1 << 25) | (1 << 24) | (1 << 23) |
+         (1 << 22) | (0 << 21) | (0 << 20) | (rn << 16) | (rd << 12) | rm);
+}
+
 // ADD Rd, Rn, #imm
 void Emitter::Emit_ADD_IMM(int rd, int rn, uint8_t imm, bool set_flags) {
     Emit(ARM_COND(COND_AL) | ARM_DP_IMM(DP_ADD, rd, rn, imm, 0, set_flags));
@@ -216,6 +228,47 @@ void Emitter::Emit_Epilogue(uint16_t exit_pc) {
 
     // POP {r4-r12, pc} - return
     Emit_POP(0x9FF0);  // r4-r12(bits 4-12) + pc(bit 15) = 0x9FF0
+}
+
+// Epilogue variant: exit PC is in a register (for RTS etc)
+// IMPORTANT: pc_reg must NOT be REG_SCRATCH0 — flag repacking clobbers it
+void Emitter::Emit_Epilogue_DynamicPC(int pc_reg) {
+    // Store A, X, Y back to DynarecState
+    Emit_STRB_IMM(REG_A, REG_STATE, DS_A);
+    Emit_STRB_IMM(REG_X, REG_STATE, DS_X);
+    Emit_STRB_IMM(REG_Y, REG_STATE, DS_Y);
+
+    // Repack lazy NZ + carry into 6502 status byte
+    Emit_LDRB_IMM(REG_SCRATCH0, REG_STATE, DS_STATUS);
+    Emit_AND_IMM(REG_SCRATCH0, REG_SCRATCH0, 0x7C);  // keep V,B,D,I
+    Emit(ARM_COND(COND_AL) | ARM_DP(DP_ORR, REG_SCRATCH0, REG_SCRATCH0, REG_CARRY, false));
+    Emit_TST_IMM(REG_NZ, 0xFF);
+    Emit(ARM_COND(COND_EQ) | ARM_DP_IMM(DP_ORR, REG_SCRATCH0, REG_SCRATCH0, 0x02, 0, false));
+    Emit_TST_IMM(REG_NZ, 0x80);
+    Emit(ARM_COND(COND_NE) | ARM_DP_IMM(DP_ORR, REG_SCRATCH0, REG_SCRATCH0, 0x80, 0, false));
+    Emit_STRB_IMM(REG_SCRATCH0, REG_STATE, DS_STATUS);
+
+    // Store exit PC from register (STRH pc_reg, [r12, #DS_PC])
+    {
+        uint8_t offset_hi = (DS_PC >> 4) & 0xF;
+        uint8_t offset_lo = DS_PC & 0xF;
+        uint32_t insn = (0xE << 28) | (0x1 << 24) | (1 << 23) | (1 << 22) |
+                        (0 << 21) | (0 << 20) |
+                        (REG_STATE << 16) | (pc_reg << 12) |
+                        (offset_hi << 8) | (0xB << 4) | offset_lo;
+        Emit(insn);
+    }
+
+    // Store cycles_executed
+    if (cycles <= 255) {
+        Emit_MOV_IMM(REG_SCRATCH0, (uint8_t)cycles);
+    } else {
+        LoadImm16(REG_SCRATCH0, (uint16_t)cycles);
+    }
+    Emit_STR_IMM(REG_SCRATCH0, REG_STATE, DS_CYCLES_EXEC);
+
+    // POP {r4-r12, pc} - return
+    Emit_POP(0x9FF0);
 }
 
 // Copy result byte to NZ register for lazy flag evaluation
